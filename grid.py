@@ -1,6 +1,7 @@
 
-import time
 from rpi_ws281x import *
+import imageio
+import time
 
 class Screen:
    def __init__(self):
@@ -29,7 +30,7 @@ class Screen:
       # Intialize the library (must be called once before other functions).
       self.strip.begin()
 
-   def set_pixel(self, x, y, color):
+   def set_pixel(self, x, y, color, refresh_grid = True):
       if x < 0 or x > self.LED_ROWS - 1:
         raise "Invalid row"
       if y < 0 or y > self.LED_COLUMNS - 1:
@@ -40,22 +41,29 @@ class Screen:
          y = self.LED_ROWS - 1 - y   
       position_in_grid = x * self.LED_ROWS + y
       self.strip.setPixelColor(position_in_grid, color)
+      if refresh_grid:
+         self.strip.show()
+
+   def set_image(self, image):
+      rows, columns, channels = image.shape
+      assert rows > 0 and rows < self.LED_ROWS:
+      assert columns > 0 and columns < self.LED_COLUMNS:
+      assert channels >= 3:
+      for i, row in enumerate(self.current_grid):
+        for j, current_color_value in enumerate(row):
+             new_color_value = Color(image[i][j][0], image[i][j][1], image[i][j][2])
+             if current_color_value != new_color_value:
+                 self.current_grid[i][j] = new_color_value 
+                 self.set_pixel(i, j, new_color_value, False)
       self.strip.show()
 
-   def set_grid(self, grid):
-      if len(grid) != self.LED_ROWS:
-        raise "Invalid rows"
-      if len(grid[0]) != self.LED_COLUMNS:
-        raise "Invalid columns"
-      self.current_grid = grid
-      for i, row in enumerate(self.current_grid):
-        for j, color_value in enumerate(row):
-            self.set_pixel(i, j, color_value)
-
+   def read_image(self, path):
+      image = imageio.imread(path)
+      self.set_image(image)
+ 
    def clear_grid(self):
-      for i in range(self.LED_ROWS):
-         for j in range(self.LED_COLUMNS):
-            self.set_pixel(i, j, Color(0, 0, 0))
+      blank_image = [ [ (0, 0, 0) for value in range(self.LED_COLUMNS) ] for row in range(self.LED_ROWS) ] 
+      self.set_image(blank_image)
 
 if __name__ == "__main__":
     grid = Screen()
