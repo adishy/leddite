@@ -1,6 +1,5 @@
-
-from rpi_ws281x import *
 import imageio
+from rpi_ws281x import *
 import time
 
 class Screen:
@@ -45,25 +44,34 @@ class Screen:
          self.strip.show()
 
    def set_image(self, image):
-      rows, columns, channels = image.shape
-      assert rows > 0 and rows < self.LED_ROWS:
-      assert columns > 0 and columns < self.LED_COLUMNS:
-      assert channels >= 3:
+      #rows, columns, channels = image.shape
+      #print("Rows:", rows, "Columns:", columns, "Channels:", channels)
+      #print("Actual rows:", self.LED_ROWS, "Actual columns:", self.LED_COLUMNS)
+      #assert rows > 0 and rows <= self.LED_ROWS
+      #assert columns > 0 and columns <= self.LED_COLUMNS
+      #assert channels >= 3
       for i, row in enumerate(self.current_grid):
         for j, current_color_value in enumerate(row):
-             new_color_value = Color(image[i][j][0], image[i][j][1], image[i][j][2])
+             new_color_value = Color(int(image[i][j][0]), int(image[i][j][1]), int(image[i][j][2]))
              if current_color_value != new_color_value:
                  self.current_grid[i][j] = new_color_value 
                  self.set_pixel(i, j, new_color_value, False)
       self.strip.show()
 
+   def overwrite_image(self, image):
+      for i, row in enumerate(image):
+         for j, value in enumerate(row):
+             new_color_value = Color(int(image[i][j][0]), int(image[i][j][1]), int(image[i][j][2]))
+             self.set_pixel(i, j, new_color_value, False)
+      self.strip.show()
+   
    def read_image(self, path):
       image = imageio.imread(path)
-      self.set_image(image)
+      self.overwrite_image(image)
  
    def clear_grid(self):
       blank_image = [ [ (0, 0, 0) for value in range(self.LED_COLUMNS) ] for row in range(self.LED_ROWS) ] 
-      self.set_image(blank_image)
+      self.overwrite_image(blank_image)
 
 if __name__ == "__main__":
     grid = Screen()
@@ -75,5 +83,7 @@ if __name__ == "__main__":
     #      grid.set_pixel(i, 0, white)
     path = "/home/pi/test.png"
     grid.read_image(path)    
-    #time.sleep(5) 
+    #image = [ [ ( 255, 255, 0) for j in range(16) ] for i in range(16) ] 
+    #grid.overwrite_image(image) 
+    time.sleep(5) 
     grid.clear_grid()       
