@@ -68,10 +68,12 @@ class Screen:
 if __name__ == "__main__":
     grid = Screen()
     white = Color(255, 255, 255)
-    for i in range(16):
-       if i % 2 > 0:
-          grid.set_pixel(i, 15, white) 
-       else:
-          grid.set_pixel(i, 0, white)
-    time.sleep(5) 
+    #for i in range(16):
+    #   if i % 2 > 0:
+    #      grid.set_pixel(i, 15, white) 
+    #   else:
+    #      grid.set_pixel(i, 0, white)
+    path = "/home/pi/test.png"
+    grid.read_image(path)    
+    #time.sleep(5) 
     grid.clear_grid()       
