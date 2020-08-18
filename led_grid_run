@@ -1,0 +1,12 @@
+#!/bin/bash
+# led_grid_run
+
+# Stop on errors
+# See https://vaneyckt.io/posts/safer_bash_scripts_with_set_euxo_pipefail/
+set -Eeuo pipefail
+
+export FLASK_DEBUG=True
+export FLASK_APP=led_grid
+export LED_GRID_SETTINGS=config.py
+
+flask run --host 0.0.0.0 --port 8000
