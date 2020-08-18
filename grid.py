@@ -81,7 +81,7 @@ if __name__ == "__main__":
     #      grid.set_pixel(i, 15, white) 
     #   else:
     #      grid.set_pixel(i, 0, white)
-    path = "/home/pi/test.png"
+    path = "/home/pi/test/test6.png"
     grid.read_image(path)    
     #image = [ [ ( 255, 255, 0) for j in range(16) ] for i in range(16) ] 
     #grid.overwrite_image(image) 
