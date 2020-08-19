@@ -42,7 +42,7 @@ def pixel_set():
             return jsonify({
                             "message": "Finished setting pixel!",
                             "position": { "x": x, "y": y },
-                            "color": { "r": r, "g": g, "b", b },
+                            "color": { "r": r, "g": g, "b": b },
                             "status_code": 200
                            }), 200
 
@@ -95,12 +95,12 @@ def pixel_delete():
 @led_grid.app.route('/api/v1/pixel/delete_all', methods=['POST'])
 def pixel_delete_all():
    """Deletes all pixels"""
-    if request.method == 'POST':
-        led_grid.screen.clear_grid()
+   if request.method == 'POST':
+      led_grid.screen.clear_grid()
 
-    return jsonify({ 
-                     "message": "Erased content of screen",
-                     "status_code": 200
-                   }), 200
+      return jsonify({ 
+                       "message": "Erased content of screen",
+                       "status_code": 200
+                     }), 200
 
 
