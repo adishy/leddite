@@ -13,10 +13,14 @@ def upload():
         file = request.files['file']
         _, temp_filename = tempfile.mkstemp()
         file.save(temp_filename)
-        print("~~~~~~~", temp_filename)
         led_grid.screen.read_image(temp_filename)
-        time.sleep(5) 
-        led_grid.screen.clear_grid()       
 
-    #return redirect(url_for('show'))
-    return "Helloo"
+    return redirect(url_for('show'))
+
+@led_grid.app.route('/erase_screen', methods=['POST'])
+def upload():
+    if request.method == 'POST':
+        led_grid.screen.clear_grid()
+
+    return redirect(url_for('show'))
+
