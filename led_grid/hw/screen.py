@@ -43,6 +43,9 @@ class Screen:
       if refresh_grid:
          self.strip.show()
 
+   def set_pixel_rgb(self, x, y, r, g, b, refresh_grid = True):
+      self.set_pixel(x, y, Color(r, g, b), refresh_grid)
+
    def set_image(self, image):
       #rows, columns, channels = image.shape
       #print("Rows:", rows, "Columns:", columns, "Channels:", channels)

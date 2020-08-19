@@ -18,7 +18,7 @@ def upload():
     return redirect(url_for('show'))
 
 @led_grid.app.route('/erase_screen', methods=['POST'])
-def upload():
+def erase_screen():
     if request.method == 'POST':
         led_grid.screen.clear_grid()
 
