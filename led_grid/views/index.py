@@ -7,6 +7,10 @@ import tempfile
 def show():
     return render_template('index.html')
 
+@led_grid.app.route('/editor', methods=['GET'])
+def editor():
+    return render_template('pixel_editor.html')
+
 @led_grid.app.route('/upload', methods=['POST'])
 def upload():
     if request.method == 'POST':

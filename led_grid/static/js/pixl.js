@@ -17,6 +17,7 @@ let HEIGHT_BASIS = 400;
 let HEIGHT = 400; //px
 let PREVIEW_IMAGE_BASE = 128; //px
 let PREVIEW_IMAGE_SCALE = 0.25;
+let LED_GRID_URL = "http://192.168.86.33/api/v1/"
 // -> NUM_ROWS & NUM_COLS have to be even multiple of 16
 const NUM_ROWS = 16; 
 const NUM_COLS = 16;
@@ -35,6 +36,9 @@ let clickAndDrag=true;
 let DRAG_DELAY_MS=50; //ms before mouse "click-and-drag" event is handled
 //Indices of squares to be updated
 let dirtyIndices=[];
+let changedPixels={}
+const SET = 0;
+const DELETE = 1;
 
 /* Generate color palette */
 function generatePalette(startColor='goldenrod') {
@@ -42,7 +46,7 @@ function generatePalette(startColor='goldenrod') {
     let analogues=[];
     let temp=lastC.analogous();
     analogues.push(temp[temp.length-1]);
-    for (var i=0;i<10;i++) {
+    for (let i=0;i<10;i++) {
         if (i%2==0) { temp=analogues[i].analogous(); }
         else { temp=analogues[i].tetrad(); }
         analogues.push(temp[temp.length-1].spin(Math.random()*20));
@@ -80,7 +84,7 @@ function drawGrid() {
     ctx.lineWidth = 0.5;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.translate(0.5, 0.5); //pad and decimal place
-    for (var i=0;i<=NUM_COLS*BOX_SIDE_LENGTH;i+=BOX_SIDE_LENGTH) { //i = col
+    for (let i=0;i<=NUM_COLS*BOX_SIDE_LENGTH;i+=BOX_SIDE_LENGTH) { //i = col
     //draw vertical line HEIGHT length, x=i
         ctx.beginPath();
         ctx.moveTo(i, 0);
@@ -102,19 +106,26 @@ function idxToRowCol(idx) {
     return {row, col};
 }
 
-function coordsToIdx(X, Y) {
-    let col = Math.floor(X/BOX_SIDE_LENGTH);
-    let row = Math.floor(Y/BOX_SIDE_LENGTH);
-    return row*NUM_ROWS+col;
-}
-
-function setData(idx, color) {
+function setData(x, y, color) {
+    let col = Math.floor(x/BOX_SIDE_LENGTH);
+    let row = Math.floor(y/BOX_SIDE_LENGTH);
+    let idx = row*NUM_ROWS + col
+    console.log(row, col, color)
     if (dirtyIndices.includes(idx)) { return false; }
     let currentColor=canvasData[idx];
     if (!clickAndDrag) {
-        if (color!==currentColor) { canvasData[idx]=color;
-        } else { canvasData[idx]=DEFAULT_COLOR; }
-    } else { canvasData[idx]=color; }
+        if (color!==currentColor) { 
+		canvasData[idx]=color;
+        	changedPixels[idx] = color
+	} 
+	else { 
+		canvasData[idx]=DEFAULT_COLOR; 
+		changedPixels[idx] = "delete"
+	}
+    } else { 
+	    canvasData[idx]=color; 
+            changedPixels[idx] = color
+    }
     dirtyIndices.push(idx);
 }
 
@@ -190,7 +201,7 @@ function grabCanvas(width, transparent, bgColor, data) {
         blitCtx.closePath();
     }
 
-    for (var i=0;i<data.length;i++) {
+    for (let i=0;i<data.length;i++) {
         let row=Math.floor(i/NUM_ROWS);
         let col=i%NUM_COLS;
         let color=data[i];
@@ -233,8 +244,8 @@ function handleSavedImageClick(e) {
     const canvasID='cvs_'+e.target.id.split('_')[1];
     let name=window.prompt('Enter a file name for the PNG.');
     if (!name) { return false; }
-    var saveCanvas=document.getElementById(canvasID);
-    var link = document.createElement('a');
+    let saveCanvas=document.getElementById(canvasID);
+    let link = document.createElement('a');
     document.body.appendChild(link);
     link.download=name+".png";
     link.href = saveCanvas.toDataURL("image/png").replace("image/png", "image/octet-stream");;
@@ -248,6 +259,7 @@ function forceRedraw() { dirtyIndices=canvasData.map((e,idx)=>idx); }
 function resetCanvas() {
     canvasData=canvasData.map(e=>DEFAULT_COLOR);
     dirtyIndices=canvasData.map((e,idx)=>idx);
+    deleteAllPixels()
 }
 
 /* Event Handlers and Listeners */
@@ -255,7 +267,7 @@ function handleClick(e) {
     let X=e.offsetX;
     let Y=e.offsetY;
     if ((X>=WIDTH||X<=0)||(Y>=HEIGHT||Y<=0)) { return false; }
-    setData(coordsToIdx(X, Y), currentColor);
+    setData(X, Y, currentColor);
 }
 
 function handleMouseMove(e) {
@@ -265,7 +277,7 @@ function handleMouseMove(e) {
         let Y=e.offsetY;
         clickAndDrag=true;
         if ((X>=WIDTH||X<=0)||(Y>=HEIGHT||Y<=0)) { return false; }
-        else { setData(coordsToIdx(X, Y), currentColor); }
+        else { setData(X, Y, currentColor); }
     }
 }
 
@@ -279,11 +291,13 @@ function handleMouseUp(e) {
         let X=e.offsetX;
         let Y=e.offsetY;
         if ((X>=WIDTH||X<=0)||(Y>=HEIGHT||Y<=0)) { return false; }
-        setData(coordsToIdx(X, Y), currentColor); 
+        setData(X, Y, currentColor); 
     }
     mouseDown=false;
     mouseDownAt=null;
     clickAndDrag=false;
+
+    setMultiplePixels()
 }
 
 function updateBackgroundColor(e) {
@@ -391,7 +405,7 @@ function addListeners() {
 
 //main drawing loop
 function drawData() {
-    for (var i=0;i<dirtyIndices.length;i++) {
+    for (let i=0;i<dirtyIndices.length;i++) {
         let color=canvasData[dirtyIndices[i]];
         colorBox(idxToRowCol(dirtyIndices[i]), color);
     }
@@ -429,11 +443,139 @@ function redrawAtScale(n) { //scales components of screen to factor N and redraw
     forceRedraw();
 }
 
+function setPixel(x, y, color){
+    let bigint = parseInt(color.substr(1), 16);
+    let r = (bigint >> 16) & 255;
+    let g = (bigint >> 8) & 255;
+    let b = bigint & 255;
+
+    let value = {
+	"position": {
+		"x": x,
+		"y": y
+	},
+
+	"color": {
+		"r": r,
+		"g": g,
+		"b": b
+	}
+    }
+
+    fetch(`${LED_GRID_URL}/pixel/set`, {
+          method: 'POST',
+          mode: 'cors',
+          cache: 'no-cache', 
+          credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          redirect: 'follow',
+          referrerPolicy: 'no-referrer', 
+          body: JSON.stringify(value) 
+      });
+}
+
+function setAndEraseMultiplePixels(){
+     let values = []
+
+     for (let [idx, pixel_state] of Object.entries(changedPixels)) {
+  	console.log(`${key}: ${pixel_state}`);
+
+        let position = idxToRowCol(key)
+	
+	if(pixel_state == "delete"){
+		// If pixel_state is "delete", the pixel should
+		// be deleted
+		values.push({
+			"action": "delete",
+			"position": {
+				"x": position['row'],
+				"y": position['col']
+			}
+		})
+	}
+	else {
+		// If pixel_state is not "delete", it is a hex string
+		// for the color of the pixel and the pixel should be
+		// set to that color
+		let color = pixel_state.substr(1)
+    		let bigint = parseInt(color.substr(1), 16);
+    		let r = (bigint >> 16) & 255;
+    		let g = (bigint >> 8) & 255;
+    		let b = bigint & 255;
+
+		values.push({	
+			"action": "set",
+			"position": {
+				"x": position['row'],
+				"y": position['col']
+			},
+			"color": {
+				"r": r,
+				"g": g,
+				"b": b
+			}
+		})
+	}
+     }
+
+     fetch(`${LED_GRID_URL}/pixel/set_and_delete_multiple`, {
+          method: 'POST',
+          mode: 'cors',
+          cache: 'no-cache', 
+          credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          redirect: 'follow',
+          referrerPolicy: 'no-referrer', 
+          body: JSON.stringify({ 'pixels': values }) 
+      });
+	
+}
+
+function deletePixel(x, y){
+    let value = {
+	"position": {
+		"x": x,
+		"y": y
+	},
+    }
+
+    fetch(`${LED_GRID_URL}/pixel/delete`, {
+          method: 'POST',
+          mode: 'cors',
+          cache: 'no-cache', 
+          credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          redirect: 'follow',
+          referrerPolicy: 'no-referrer', 
+          body: JSON.stringify(value) 
+      });
+}
+
+function deleteAllPixels(){
+    fetch(`${LED_GRID_URL}/pixel/delete_all`, {
+          method: 'POST',
+          mode: 'cors',
+          cache: 'no-cache', 
+          credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          redirect: 'follow',
+          referrerPolicy: 'no-referrer', 
+      });
+}
+
 window.onload = function() {
     initEditor();
     drawData();
 
-    var bigWindow = window.matchMedia("(min-width: 700px)"); // Create the query list.
+    let bigWindow = window.matchMedia("(min-width: 700px)"); // Create the query list.
     function handleOrientationChange(mql) { 
         isLargeScreen = mql.matches ? true : false;
         if (!isLargeScreen) { //transition to small screen
