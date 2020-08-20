@@ -62,7 +62,9 @@ def pixel_delete():
 def pixel_set_and_delete_multiple():
     """Sets an array of pixels at specified positions and colors"""
     request_data = json.loads(request.data)
-    
+   
+    print("pixels:", request_data)
+
     for pixel in request_data['pixels']:
         try:
             action = pixel['action']

@@ -17,7 +17,8 @@ let HEIGHT_BASIS = 400;
 let HEIGHT = 400; //px
 let PREVIEW_IMAGE_BASE = 128; //px
 let PREVIEW_IMAGE_SCALE = 0.25;
-let LED_GRID_URL = "http://192.168.86.33/api/v1/"
+let LED_GRID_URL = "http://192.168.86.33/api/v1"
+//let LED_GRID_URL = "http://localhost:8000/api/v1"
 // -> NUM_ROWS & NUM_COLS have to be even multiple of 16
 const NUM_ROWS = 16; 
 const NUM_COLS = 16;
@@ -297,7 +298,7 @@ function handleMouseUp(e) {
     mouseDownAt=null;
     clickAndDrag=false;
 
-    setMultiplePixels()
+    setAndEraseMultiplePixels()
 }
 
 function updateBackgroundColor(e) {
@@ -480,9 +481,9 @@ function setAndEraseMultiplePixels(){
      let values = []
 
      for (let [idx, pixel_state] of Object.entries(changedPixels)) {
-  	console.log(`${key}: ${pixel_state}`);
+  	console.log(`${idx}: ${pixel_state}`);
 
-        let position = idxToRowCol(key)
+        let position = idxToRowCol(idx)
 	
 	if(pixel_state == "delete"){
 		// If pixel_state is "delete", the pixel should
