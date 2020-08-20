@@ -17,7 +17,7 @@ let HEIGHT_BASIS = 400;
 let HEIGHT = 400; //px
 let PREVIEW_IMAGE_BASE = 128; //px
 let PREVIEW_IMAGE_SCALE = 0.25;
-let LED_GRID_URL = "http://192.168.86.33/api/v1"
+let LED_GRID_URL = "http://192.168.86.33:8000/api/v1"
 //let LED_GRID_URL = "http://localhost:8000/api/v1"
 // -> NUM_ROWS & NUM_COLS have to be even multiple of 16
 const NUM_ROWS = 16; 
@@ -500,8 +500,8 @@ function setAndEraseMultiplePixels(){
 		// If pixel_state is not "delete", it is a hex string
 		// for the color of the pixel and the pixel should be
 		// set to that color
-		let color = pixel_state.substr(1)
-    		let bigint = parseInt(color.substr(1), 16);
+		let color = pixel_state.replace("#", "")
+    		let bigint = parseInt(color, 16);
     		let r = (bigint >> 16) & 255;
     		let g = (bigint >> 8) & 255;
     		let b = bigint & 255;
@@ -533,7 +533,7 @@ function setAndEraseMultiplePixels(){
           referrerPolicy: 'no-referrer', 
           body: JSON.stringify({ 'pixels': values }) 
       });
-	
+     changedPixels = {}	
 }
 
 function deletePixel(x, y){

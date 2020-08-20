@@ -76,6 +76,9 @@ class Screen:
       blank_image = [ [ (0, 0, 0) for value in range(self.LED_COLUMNS) ] for row in range(self.LED_ROWS) ] 
       self.overwrite_image(blank_image)
 
+   def refresh(self):
+      self.strip.show()
+
 if __name__ == "__main__":
     grid = Screen()
     white = Color(255, 255, 255)
