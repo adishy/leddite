@@ -1,17 +1,17 @@
 class VirtualScreen:
-    def __init__(self, width, height):
-        self.width = width
-        self.height = height
+    def __init__(self, height, width):
+        self.width_v = width
+        self.height_v = height
         self.default_color = (0, 0, 0)
         row = [ self.default_color for _ in range(self.width) ]
         self.screen = [ row for _ in range(self.height) ]
     
-    def height(self):
-        return self.height
-
     def width(self):
-        return self.width
+        return self.width_v
 
+    def height(self):
+        return self.height_v
+        
     def show(self):
         for i in screen:
             print(i)

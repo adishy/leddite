@@ -2,6 +2,7 @@ from track import Track
 from screen import Screen
 from font import font_med
 from virtual_screen import VirtualScreen
+import sys
 
 def test_content(height, width, excess):
     color = (255, 255, 255)
@@ -23,11 +24,11 @@ def calculate_tracks(screen, content_height, spacing, mode="hw"):
         horizontal_shift += spacing + content_height
     return tracks
 
-def test_track(virtual_screen=False):
+def test_track(virtual_screen=False, v_height=16, v_width=16):
     if not virtual_screen:
         screen = Screen()
     else:
-        screen = VirtualScreen()
+        screen = VirtualScreen(v_height, v_width)
     screen_height = screen.height()
     screen_width =  screen.width()
     font_height = font_med["height"]
@@ -46,7 +47,22 @@ def test_track(virtual_screen=False):
         if virtual_screen:
             screen.show()
         sleep(200)
-    
+
+def show_usage():
+    print("Usage:", sys.argv[0], " Optional: [--virtual <screen_height> <screen_width>]")
+
 if __name__ == '__main__':
+    if "-h" in sys.argv or "--help" in sys.argv:
+        show_usage()
+        exit(0)
     test_virtual_screen = False
+    if "--virtual" in sys.argv:
+        index = sys.argv.index("--virtual")
+        if len(sys.argv) < 4 or len(sys.argv[index::]) < 3:
+            show_usage()
+            exit(1)
+        test_virtual_screen = True
+        screen_height = int(sys.argv[index + 1])
+        screen_width = int(sys.argv[index + 2])
+        
     test_track(test_virtual_screen)
