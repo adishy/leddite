@@ -3,8 +3,8 @@ class VirtualScreen:
         self.width_v = width
         self.height_v = height
         self.default_color = (0, 0, 0)
-        row = [ self.default_color for _ in range(self.width) ]
-        self.screen = [ row for _ in range(self.height) ]
+        row = [ self.default_color for _ in range(self.width_v) ]
+        self.screen = [ row for _ in range(self.height_v) ]
     
     def width(self):
         return self.width_v
