@@ -47,7 +47,7 @@ def test_track(virtual_screen=False, v_height=16, v_width=16):
             track.horizontal_shift_one()
         if virtual_screen:
             screen.show()
-        time.sleep(200)
+        time.sleep(0.2)
 
 def show_usage():
     print("Usage:", sys.argv[0], " Optional: [--virtual <screen_height> <screen_width>]")
