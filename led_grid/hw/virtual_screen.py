@@ -16,7 +16,7 @@ class VirtualScreen:
         for i in screen:
             print(i)
             
-    def set_pixel(x, y, color):
+    def set_pixel(self, x, y, color):
         self.screen[x][y] = color
 
     def __repr__(self):
