@@ -2,9 +2,7 @@ class VirtualScreen:
     def __init__(self, height, width):
         self.width_v = width
         self.height_v = height
-        self.default_color = (0, 0, 0)
-        row = [ self.default_color for _ in range(self.width_v) ]
-        self.screen = [ row for _ in range(self.height_v) ]
+        self.screen = [ [ (0, 0, 0) for _ in range(self.width_v) ] for _ in range(self.height_v) ]
     
     def width(self):
         return self.width_v
@@ -13,10 +11,10 @@ class VirtualScreen:
         return self.height_v
         
     def show(self):
-        for i in self.screen:
-            print(i)
+        for y in self.screen:
+            print(y)
             
-    def set_pixel(self, x, y, color):
+    def set_pixel(self, y, x, color):
         self.screen[x][y] = color
 
     def __repr__(self):
@@ -25,7 +23,6 @@ class VirtualScreen:
             screen_diagram += f"{i}\n"
         return screen_diagram
 
-if __name__ == '__main__':
-    screen = VirtualScreen(16, 16)
-    screen.set_pixel(0, 0, (255, 1, 0))
-    screen.show()
+screen = VirtualScreen(16, 16)
+screen.set_pixel(0, 0, (255, 8, 0))
+screen.show()
