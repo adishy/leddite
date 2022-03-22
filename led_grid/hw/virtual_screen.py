@@ -13,7 +13,7 @@ class VirtualScreen:
         return self.height_v
         
     def show(self):
-        for i in screen:
+        for i in self.screen:
             print(i)
             
     def set_pixel(self, x, y, color):
