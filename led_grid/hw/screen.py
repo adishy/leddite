@@ -29,6 +29,12 @@ class Screen:
       # Intialize the library (must be called once before other functions).
       self.strip.begin()
 
+   def height(self):
+      return self.LED_ROWS
+
+   def width(self):
+      return self.LED_COLUMNS
+      
    def set_pixel(self, x, y, color, refresh_grid = True):
       if x < 0 or x > self.LED_ROWS - 1:
         raise "Invalid row"

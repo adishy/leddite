@@ -1,12 +1,13 @@
 class Track:
     def __init__(self,
+                 screen,
                  track_height,
                  track_width,
                  horizontal_shift,
                  vertical_shift,
                  shift_timing_ms=300):
+        self.screen = screen
         self.timing = shift_timing_ms
-        
         self.height = track_height
         self.width = track_width
         self.horizontal_shift = horizontal_shift
@@ -31,16 +32,13 @@ class Track:
     def get_contents_width(self):
         return int(len(self.contents) / self.height)
     
-    def set_pixel(self, x, y, color):
-        screen[x][y] = color
-    
     def write_to_screen(self):
         for x in range(self.height):
             for y in range(self.width):
                 contents_y_val = ( y + self.current_horizontal_shift ) % self.get_contents_width()
-                self.set_pixel(x + self.vertical_shift,
-                               y + self.horizontal_shift,
-                               self.get_contents(x, contents_y_val))
+                self.screen.set_pixel(x + self.vertical_shift,
+                                      y + self.horizontal_shift,
+                                      self.get_contents(x, contents_y_val))
 
 
     def horizontal_shift_one(self):
