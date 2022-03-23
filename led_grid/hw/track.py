@@ -27,18 +27,18 @@ class Track:
         self.contents += content
     
     def get_contents(self, x, y):
-        return self.contents[ ( y * self.height ) + x ]
+        return self.contents[ ( x * self.height ) + y ]
     
     def get_contents_width(self):
         return int(len(self.contents) / self.height)
     
     def write_to_screen(self):
-        for x in range(self.height):
-            for y in range(self.width):
-                contents_y_val = ( y + self.current_horizontal_shift ) % self.get_contents_width()
-                self.screen.set_pixel(x + self.vertical_shift,
-                                      y + self.horizontal_shift,
-                                      self.get_contents(x, contents_y_val))
+        for x in range(self.width):
+            for y in range(self.height):
+                contents_x_val = ( x + self.current_horizontal_shift ) % self.get_contents_width()
+                self.screen.set_pixel(x + self.horizontal_shift,
+                                      y + self.vertical_shift,
+                                      self.get_contents(contents_x_val, y))
 
 
     def horizontal_shift_one(self):

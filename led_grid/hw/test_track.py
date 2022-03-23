@@ -1,5 +1,5 @@
 from track import Track
-from screen import Screen
+#from screen import Screen
 from font import font_med
 from virtual_screen import VirtualScreen
 import time
@@ -11,9 +11,10 @@ def test_content(height, width, excess):
     for i in range(width + excess):
         for j in range(height):
             content.append((255, (i * 10) % 256, (j * 10) % 256))
+    print("Content:", height, width)
     return content
 
-def calculate_tracks(screen, content_height, spacing, mode="hw"):
+def calculate_tracks(screen, content_height, spacing):
     screen_height = screen.height()
     screen_width = screen.width()
     assert(content_height < screen_height)
@@ -21,7 +22,7 @@ def calculate_tracks(screen, content_height, spacing, mode="hw"):
     track_count = int(screen_height / (content_height + spacing))
     horizontal_shift = spacing
     for i in range(track_count):
-        tracks.append(Track(content_height, screen_width, 0, horizontal_shift, mode))
+        tracks.append(Track(screen, content_height, screen_width, 0, horizontal_shift))
         horizontal_shift += spacing + content_height
     return tracks
 
@@ -39,8 +40,10 @@ def test_track(virtual_screen=False, v_height=16, v_width=16):
     tracks = calculate_tracks(screen, font_height, spacing)
     for track in tracks:
         track.add_content(test_content(font_height, screen_width, out_of_screen_cols))
-        
-    for i in range(28):
+    
+    print(track.get_contents_width())
+   
+    while(True): 
         for i, track in enumerate(tracks):
             print(f"Track {i}: Current Shift: {track.current_horizontal_shift}")
             track.write_to_screen()
@@ -66,4 +69,4 @@ if __name__ == '__main__':
         screen_height = int(sys.argv[index + 1])
         screen_width = int(sys.argv[index + 2])
         
-    test_track(test_virtual_screen)
+    test_track(test_virtual_screen, screen_height, screen_width)

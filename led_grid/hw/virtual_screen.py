@@ -11,6 +11,9 @@ class VirtualScreen:
         return self.height_v
         
     def show(self):
+        print(chr(27)+'[2j')
+        print('\033c')
+        print('\x1bc')
         for y in self.screen:
             print(y)
             
@@ -23,6 +26,7 @@ class VirtualScreen:
             screen_diagram += f"{i}\n"
         return screen_diagram
 
-screen = VirtualScreen(16, 16)
-screen.set_pixel(0, 0, (255, 8, 0))
-screen.show()
+if __name__ == '__main__':
+  screen = VirtualScreen(16, 16)
+  screen.set_pixel(0, 0, (255, 8, 0))
+  screen.show()
