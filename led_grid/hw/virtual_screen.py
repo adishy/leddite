@@ -17,8 +17,11 @@ class VirtualScreen:
         for y in self.screen:
             print(y)
             
-    def set_pixel(self, y, x, color):
+    def set_pixel(self, y, x, color, refresh_grid=True):
         self.screen[x][y] = color
+
+    def refresh():
+        print("Refreshed!") 
 
     def __repr__(self):
         screen_diagram = ""

@@ -38,7 +38,9 @@ class Track:
                 contents_x_val = ( x + self.current_horizontal_shift ) % self.get_contents_width()
                 self.screen.set_pixel(x + self.horizontal_shift,
                                       y + self.vertical_shift,
-                                      self.get_contents(contents_x_val, y))
+                                      self.get_contents(contents_x_val, y),
+                                      False)
+        self.screen.refresh()
 
 
     def horizontal_shift_one(self):

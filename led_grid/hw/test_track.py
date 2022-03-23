@@ -1,7 +1,5 @@
 from track import Track
-#from screen import Screen
 from font import font_med
-#from rpi_ws281x import Color
 from virtual_screen import VirtualScreen
 import time
 import sys
@@ -60,6 +58,8 @@ def calculate_tracks(screen, content_height, spacing):
 
 def test_track(virtual_screen=False, v_height=16, v_width=16):
     if not virtual_screen:
+        from rpi_ws281x import Color
+        from screen import Screen
         screen = Screen()
     else:
         screen = VirtualScreen(v_height, v_width)
