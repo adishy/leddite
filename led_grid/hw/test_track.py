@@ -1,5 +1,5 @@
 from track import Track
-#from screen import Screen
+from screen import Screen
 from font import font_med
 from virtual_screen import VirtualScreen
 import time
@@ -60,6 +60,8 @@ if __name__ == '__main__':
         show_usage()
         exit(0)
     test_virtual_screen = False
+    screen_height = 0
+    screen_width = 0
     if "--virtual" in sys.argv:
         index = sys.argv.index("--virtual")
         if len(sys.argv) < 4 or len(sys.argv[index::]) < 3:
