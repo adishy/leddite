@@ -35,10 +35,7 @@ class Screen:
    def width(self):
       return self.LED_COLUMNS
 
-   def set_pixel(self, x, y, color):
-      self.set_pixel(x, y, Color(color[0], color[1], color[2]))
-
-   def set_pixel_in_grid(self, x, y, color, refresh_grid = True):
+   def set_pixel(self, x, y, color, refresh_grid = True):
       if x < 0 or x > self.LED_ROWS - 1:
         raise "Invalid row"
       if y < 0 or y > self.LED_COLUMNS - 1:
