@@ -1,13 +1,41 @@
 from track import Track
-from screen import Screen
+#from screen import Screen
 from font import font_med
-from rpi_ws281x import Color
+#from rpi_ws281x import Color
 from virtual_screen import VirtualScreen
 import time
 import sys
 
+def get_color(virtual_screen, color):
+    if not virtual_screen:
+        return Color(color[0], color[1], color[2])
+    return color
+
+def col_major(glyph, font):
+    col_major_glyph = []
+    height = font["height"]
+    width = font["width"]
+    for x in range(width):
+        col_major_glyph += [ glyph[ y * width + x ] for y in range(height) ]
+    return col_major_glyph
+             
+def test_text(virtual_screen, value, font, color):
+    content = []
+    for symbol in value:
+        glyph = col_major(font["symbols"][symbol], font)
+        content_glyph = []
+        for pos in glyph:
+            if not pos:
+               content_glyph.append(get_color(virtual_screen, (0, 0, 0)))
+            else:
+               content_glyph.append(get_color(virtual_screen, color))
+        content += content_glyph
+        content += [ get_color(virtual_screen, (0, 0, 0)) for _ in range(font_med["height"]) ]
+    for _ in range(3):
+        content += [ get_color(virtual_screen, (0, 0, 0)) for _ in range(font_med["height"]) ]
+    return content
+         
 def test_content(virtual_screen, height, width, excess):
-    color = (255, 255, 255)
     content = []
     for i in range(width + excess):
         for j in range(height):
@@ -43,7 +71,8 @@ def test_track(virtual_screen=False, v_height=16, v_width=16):
 
     tracks = calculate_tracks(screen, font_height, spacing)
     for track in tracks:
-        track.add_content(test_content(virtual_screen, font_height, screen_width, out_of_screen_cols))
+        track.add_content(test_text(virtual_screen, "HELLO THERE", font_med, (255, 255, 255)))
+        #track.add_content(test_content(virtual_screen, font_height, screen_width, out_of_screen_cols))
     
     print(track.get_contents_width())
    
