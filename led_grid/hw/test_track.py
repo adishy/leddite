@@ -62,6 +62,7 @@ def test_track(virtual_screen=False, v_height=16, v_width=16):
         from screen import Screen
         screen = Screen()
     else:
+        print(f"Virtual screen: {v_height} x {v_width}")
         screen = VirtualScreen(v_height, v_width)
     screen_height = screen.height()
     screen_width =  screen.width()
@@ -80,7 +81,7 @@ def test_track(virtual_screen=False, v_height=16, v_width=16):
         for i, track in enumerate(tracks):
             print(f"Track {i}: Current Shift: {track.current_horizontal_shift}")
             track.write_to_screen()
-            track.horizontal_shift_one()
+            track.vertical_shift_one()
         if virtual_screen:
             screen.show()
         time.sleep(0.2)

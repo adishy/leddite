@@ -13,6 +13,7 @@ class Track:
         self.horizontal_shift = horizontal_shift
         self.vertical_shift = vertical_shift
         self.current_horizontal_shift = 0
+        self.current_vertical_shift = 0
         
         # List of color values, to be displayed, col major
         # * This represents the "actual" track that might 
@@ -32,18 +33,23 @@ class Track:
     def get_contents_width(self):
         return int(len(self.contents) / self.height)
     
+    def get_contents_height(self):
+        return int(len(self.contents) / self.width)
+    
     def write_to_screen(self):
         for x in range(self.width):
             for y in range(self.height):
-                contents_x_val = ( x + self.current_horizontal_shift ) % self.get_contents_width()
+                contents_y_val = ( y + self.current_vertical_shift ) % self.get_contents_width()
+                contents_x_val = ( x + self.current_horizontal_shift ) % self.get_contents_height()
                 self.screen.set_pixel(x + self.horizontal_shift,
                                       y + self.vertical_shift,
-                                      self.get_contents(contents_x_val, y),
+                                      self.get_contents(contents_x_val, contents_y_val),
                                       False)
         self.screen.refresh()
-
 
     def horizontal_shift_one(self):
         self.current_horizontal_shift = ( self.current_horizontal_shift + 1 ) % self.get_contents_width()
 
+    def vertical_shift_one(self):
+        self.current_vertical_shift = ( self.current_vertical_shift + 1 ) % self.get_contents_height()
 

@@ -11,6 +11,7 @@ setup(
         'Flask==1.1.1',
         'requests==2.22.0',
         'sh==1.12.14',
+        'rich',
         'rpi_ws281x'
     ],
 )
