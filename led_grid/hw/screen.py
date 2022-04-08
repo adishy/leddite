@@ -77,6 +77,9 @@ class Screen:
    def read_image(self, path):
       image = imageio.imread(path)
       self.overwrite_image(image)
+
+   def is_virtual(self):
+      return False
  
    def clear_grid(self):
       blank_image = [ [ (0, 0, 0) for value in range(self.LED_COLUMNS) ] for row in range(self.LED_ROWS) ] 

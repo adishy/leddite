@@ -67,7 +67,7 @@ def test_track(virtual_screen=False, v_height=16, v_width=16):
     screen_height = screen.height()
     screen_width =  screen.width()
     font_height = font_med["height"]
-    spacing = 1                     
+    spacing = 2                     
     out_of_screen_cols = 12
 
     tracks = calculate_tracks(screen, font_height, spacing)
@@ -81,7 +81,7 @@ def test_track(virtual_screen=False, v_height=16, v_width=16):
         for i, track in enumerate(tracks):
             print(f"Track {i}: Current Shift: {track.current_horizontal_shift}")
             track.write_to_screen()
-            track.vertical_shift_one()
+            track.horizontal_shift_one()
         if virtual_screen:
             screen.show()
         time.sleep(0.2)

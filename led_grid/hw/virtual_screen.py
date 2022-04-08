@@ -13,6 +13,9 @@ class VirtualScreen:
 
     def height(self):
         return self.height_v
+
+    def is_virtual(self):
+        return True
         
     def show(self, debug=False):
         self.console.clear()

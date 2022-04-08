@@ -23,7 +23,13 @@ class Track:
         # in the content are shown (at which point it will 
         # cycle back to the beginning
         self.contents = [ ]
-        
+
+    def clear(self):
+        self.contents = []
+
+    def empty(self):
+        return not self.contents        
+
     def add_content(self, content):
         self.contents += content
     
