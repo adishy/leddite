@@ -1,12 +1,15 @@
 from rich import print as rprint
 from rich.console import Console
+import datetime
 
 class VirtualScreen:
     def __init__(self, height, width):
         self.width_v = width
         self.height_v = height
         self.screen = [ [ (0, 0, 0) for _ in range(self.width_v) ] for _ in range(self.height_v) ]
+        self.last_refresh = "NA"
         self.console = Console()
+    
     
     def width(self):
         return self.width_v
@@ -32,13 +35,14 @@ class VirtualScreen:
                    self.console.print("◘",
                                       style=f"rgb({color[0]},{color[1]},{color[2]})",
                                       end=end_row)
-           self.console.print(f"Screen dimensions: {self.height_v} x {self.height_v}")
+           self.console.print(f"Screen dimensions: {self.height_v} x {self.height_v}, Refreshed: {self.last_refresh}")
 
     def set_pixel(self, y, x, color, refresh_grid=True):
         self.screen[x][y] = color
 
-    def refresh(self):
-        print("Refreshed!") 
+    def refresh(self, debug=False):
+        self.last_refresh = datetime.datetime.now()
+        self.show(debug)
 
     def __repr__(self):
         screen_diagram = ""

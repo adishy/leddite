@@ -1,6 +1,8 @@
 from track import Track
 from font import font_med
 from virtual_screen import VirtualScreen
+#from rpi_ws281x import Color
+#from screen import Screen
 import sys
 import time
 
@@ -22,6 +24,7 @@ class Scene:
        self.track_count = -1
        if "track_count" in kwargs:
          self.track_count = kwargs["track_count"] 
+
     def get_color(self, color):
         if not self.screen.is_virtual():
             return Color(color[0], color[1], color[2])
@@ -43,18 +46,21 @@ class Scene:
             self.tracks.append(Track(self.screen, self.content_height, screen_width, 0, vertical_offset))
             vertical_offset += self.inter_track_space + self.content_height
 
-    def frame(self):    
+    def frame(self):
        for i, track in enumerate(self.tracks):
            empty = track.empty()
            if empty:
              continue
-           print(f"Track {i}: Current Shift: {track.current_horizontal_shift}")
-           track.write_to_screen()
+           if track.write_to_screen():
+              print(f"Track {i}: Current Shift: {track.current_horizontal_shift}")
            if track.get_contents_width() > screen.width():
                track.horizontal_shift_one()
-       if screen.is_virtual():
-           screen.show()
        time.sleep(self.inter_frame_pause_sec)
+
+    def display(self, update_func):
+        while True:
+            update_func(self.tracks)
+            self.frame()
 
 class TextOnlyScene(Scene):
     def __init__(self, **kwargs):
@@ -98,12 +104,12 @@ class TextOnlyScene(Scene):
             content += [ self.get_color((0, 0, 0)) for _ in range(font["height"]) ]
         return content
 
-    def add_text_to_track(self, value, track_id):
+    def add_text_to_track(self, value, track_id, color=(255,255,255)):
         if not self.tracks:
             self.generate_tracks()
         assert(track_id >= 0 and track_id < self.max_tracks())
         assert(track_id < len(self.tracks))
-        self.tracks[track_id].add_content(self.generate_text(value))
+        self.tracks[track_id].add_content(self.generate_text(value, color))
 
     def glyph_to_col_major(self, glyph, font):
         col_major_glyph = []
@@ -113,12 +119,12 @@ class TextOnlyScene(Scene):
             col_major_glyph += [ glyph[ y * width + x ] for y in range(height) ]
         return col_major_glyph
 
-
 def main(screen):
     screen_height = screen.height()
     screen_width =  screen.width()
     scene = TextOnlyScene(screen=screen, inter_track_space=1)
-    scene.add_text_to_track("HELLO THERE", 0)
+    scene.add_text_to_track("HI", 0)
+    scene.add_text_to_track("HM", 1, (0, 255, 255))
     while True:
         scene.frame()
 
@@ -139,8 +145,6 @@ if __name__ == '__main__':
         screen_width = int(sys.argv[index + 2])
         screen = VirtualScreen(screen_height, screen_width)
     else:
-        from rpi_ws281x import Color
-        from screen import Screen
         screen = Screen()
     main(screen)
 
