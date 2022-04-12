@@ -43,7 +43,7 @@ class Scene:
            self.track_count = max_tracks 
         vertical_offset = self.inter_track_space
         for i in range(self.track_count):
-            self.tracks.append(Track(self.screen, self.content_height, screen_width, 0, vertical_offset))
+            self.tracks.append(Track(self.screen, self.content_height, self.screen.width(), 0, vertical_offset))
             vertical_offset += self.inter_track_space + self.content_height
 
     def frame(self):
@@ -53,14 +53,9 @@ class Scene:
              continue
            if track.write_to_screen():
               print(f"Track {i}: Current Shift: {track.current_horizontal_shift}")
-           if track.get_contents_width() > screen.width():
+           if track.get_contents_width() > self.screen.width():
                track.horizontal_shift_one()
        time.sleep(self.inter_frame_pause_sec)
-
-    def display(self, update_func):
-        while True:
-            update_func(self.tracks)
-            self.frame()
 
 class TextOnlyScene(Scene):
     def __init__(self, **kwargs):
@@ -77,6 +72,7 @@ class TextOnlyScene(Scene):
            wrap_around_space: Space between end and start of text when text-wrapping content
         '''
         s_args = kwargs
+        self.track_values = []
         self.wrap_around_space = 3
         if "wrap_around_space" in kwargs:
             self.wrap_around_space = kwargs["wrap_around_space"]
@@ -107,9 +103,26 @@ class TextOnlyScene(Scene):
     def add_text_to_track(self, value, track_id, color=(255,255,255)):
         if not self.tracks:
             self.generate_tracks()
+            self.track_values = [ "" for _ in range(len(self.tracks)) ]
         assert(track_id >= 0 and track_id < self.max_tracks())
         assert(track_id < len(self.tracks))
         self.tracks[track_id].add_content(self.generate_text(value, color))
+        self.track_values[track_id] += value
+
+    def clear_tracks(self, id=-1):
+        if id >= len(self.tracks) or id < 0:
+            for track in self.tracks:
+                track.clear()
+            self.track_values = [ "" for _ in range(len(self.tracks)) ]
+        else:
+            self.tracks[id].clear()
+            self.track_values[id] = ""
+
+    def track_value(self, id):
+        if not self.tracks:
+            self.generate_tracks()
+            self.track_values = [ "" for _ in range(len(self.tracks)) ]
+        return self.track_values[id]
 
     def glyph_to_col_major(self, glyph, font):
         col_major_glyph = []
@@ -124,7 +137,8 @@ def main(screen):
     screen_width =  screen.width()
     scene = TextOnlyScene(screen=screen, inter_track_space=1)
     scene.add_text_to_track("HI", 0)
-    scene.add_text_to_track("HM", 1, (0, 255, 255))
+    scene.add_text_to_track("HELLO THERE", 1, (0, 255, 255))
+    
     while True:
         scene.frame()
 
