@@ -5,7 +5,7 @@ class Track:
                  track_width,
                  horizontal_shift,
                  vertical_shift,
-                 background_color=(0,0,0),
+                 background_color,
                  shift_timing_ms=300):
         self.screen = screen
         self.background_color = background_color
