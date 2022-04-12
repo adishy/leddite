@@ -43,7 +43,7 @@ class Scene:
            self.track_count = max_tracks 
         vertical_offset = self.inter_track_space
         for i in range(self.track_count):
-            self.tracks.append(Track(self.screen, self.content_height, self.screen.width(), 0, vertical_offset, self.get_color((0, 0, 0)))
+            self.tracks.append(Track(self.screen, self.content_height, self.screen.width(), 0, vertical_offset, self.get_color((0, 0, 0))))
             vertical_offset += self.inter_track_space + self.content_height
 
     def frame(self):
