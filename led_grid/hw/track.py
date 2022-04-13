@@ -6,6 +6,7 @@ class Track:
                  horizontal_shift,
                  vertical_shift,
                  background_color,
+                 do_not_scroll=False,
                  shift_timing_ms=300):
         self.screen = screen
         self.background_color = background_color
@@ -13,6 +14,7 @@ class Track:
         self.height = track_height
         self.width = track_width
         self.changed_after_last_write = True
+        self.do_not_scroll = do_not_scroll
         self.horizontal_shift = horizontal_shift
         self.vertical_shift = vertical_shift
         self.current_horizontal_shift = 0
@@ -51,8 +53,8 @@ class Track:
         for x in range(self.width):
             for y in range(self.height):
                 # Do not wrap around screne if contents is not longer than the screen dimensions required
-                if self.get_contents_width() + self.current_horizontal_shift <= self.screen.width():
-                    contents_x_val = x + self.current_horizontal_shift 
+                if self.do_not_scroll or (self.get_contents_width() + self.current_horizontal_shift <= self.screen.width()):
+                    contents_x_val = x 
                 else:
                     contents_x_val = ( x + self.current_horizontal_shift ) % self.get_contents_width()
                 self.screen.set_pixel(x + self.horizontal_shift,

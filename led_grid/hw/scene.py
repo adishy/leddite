@@ -1,8 +1,8 @@
 from track import Track
 from font import font_med
 from virtual_screen import VirtualScreen
-#from rpi_ws281x import Color
-#from screen import Screen
+from rpi_ws281x import Color
+from screen import Screen
 import sys
 import time
 
@@ -52,7 +52,7 @@ class Scene:
            if empty:
              continue
            if track.write_to_screen():
-              print(f"Track {i}: Current Shift: {track.current_horizontal_shift}")
+              print(f"Track {i}: Current Shift: {track.current_horizontal_shift}, Content width: {track.get_contents_width()}")
            if track.get_contents_width() > self.screen.width():
                track.horizontal_shift_one()
        time.sleep(self.inter_frame_pause_sec)
@@ -82,6 +82,11 @@ class TextOnlyScene(Scene):
         s_args["content_height"] = self.font["height"]
         super().__init__(**s_args)
 
+    def generate_tracks(self, track_count=-1):
+        super().generate_tracks(track_count)
+        self.track_values = [ "" for _ in range(len(self.tracks)) ]
+        
+        
     def generate_text(self, value, color=(255,255,255), font=None):
         if font is None:
             font = font_med
@@ -103,7 +108,6 @@ class TextOnlyScene(Scene):
     def add_text_to_track(self, value, track_id, color=(255,255,255)):
         if not self.tracks:
             self.generate_tracks()
-            self.track_values = [ "" for _ in range(len(self.tracks)) ]
         assert(track_id >= 0 and track_id < self.max_tracks())
         assert(track_id < len(self.tracks))
         self.tracks[track_id].add_content(self.generate_text(value, color))
@@ -113,7 +117,6 @@ class TextOnlyScene(Scene):
         if id >= len(self.tracks) or id < 0:
             for track in self.tracks:
                 track.clear()
-            self.track_values = [ "" for _ in range(len(self.tracks)) ]
         else:
             self.tracks[id].clear()
             self.track_values[id] = ""
@@ -121,7 +124,6 @@ class TextOnlyScene(Scene):
     def track_value(self, id):
         if not self.tracks:
             self.generate_tracks()
-            self.track_values = [ "" for _ in range(len(self.tracks)) ]
         return self.track_values[id]
 
     def glyph_to_col_major(self, glyph, font):
