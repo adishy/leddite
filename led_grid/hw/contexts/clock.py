@@ -1,5 +1,6 @@
-from track import Track
-from font import font_med
+from led_grid.hw.layouts.track import Track
+from led_grid.hw.fonts.font import font_med
+
 from virtual_screen import VirtualScreen
 from scene import TextOnlyScene
 from rpi_ws281x import Color
@@ -8,7 +9,9 @@ import datetime
 import sys
 import time
 
-def main(screen):
+class Clock(Context):
+    
+def clock(screen):
     change = True
     screen_height = screen.height()
     screen_width =  screen.width()
@@ -38,6 +41,9 @@ def main(screen):
         scene.frame()
 
         time.sleep(1)
+
+def main(screen):
+    clock(screen)
 
 if __name__ == '__main__':
     if "-h" in sys.argv or "--help" in sys.argv:

@@ -1,8 +1,9 @@
+from led_grid.hw.screens.screen import Screen
 import imageio
 from rpi_ws281x import *
 import time
 
-class Screen:
+class PhysicalScreen(Screen):
    def __init__(self):
       # LED strip configuration:
       self.LED_ROWS       = 16
@@ -34,6 +35,9 @@ class Screen:
 
    def width(self):
       return self.LED_COLUMNS
+
+   def color(self, color_tuple):
+        return Color(color[0], color[1], color[2])
 
    def set_pixel(self, x, y, color, refresh_grid = True):
       if x < 0 or x > self.LED_ROWS - 1:

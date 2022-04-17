@@ -6,6 +6,9 @@ app.config.from_envvar('LED_GRID_SETTINGS', silent=True)
 
 import led_grid.views  # noqa: E402  pylint: disable=wrong-import-position
 import led_grid.api    # noqa: E402  pylint: disable=wrong-import-position 
-from led_grid.hw import Screen  # noqa: E402  pylint: disable=wrong-import-position  
+import led_grid.hw     # noqa: E402  pylint: disable=wrong-import-position  
 
-screen = Screen()
+screen = led_grid.hw.screens.VirtualScreen(16, 16) 
+yield_current = None
+yield_prev = None
+

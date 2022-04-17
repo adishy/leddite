@@ -1,8 +1,6 @@
-from track import Track
-from font import font_med
-from virtual_screen import VirtualScreen
-from rpi_ws281x import Color
-from screen import Screen
+from led_grid.hw.layouts.track import Track
+from led_grid.hw.fonts import font_med
+from led_grid.hw.screens import *
 import sys
 import time
 
@@ -24,11 +22,6 @@ class Scene:
        self.track_count = -1
        if "track_count" in kwargs:
          self.track_count = kwargs["track_count"] 
-
-    def get_color(self, color):
-        if not self.screen.is_virtual():
-            return Color(color[0], color[1], color[2])
-        return color
     
     def max_tracks(self):        
         screen_height = self.screen.height()
@@ -43,7 +36,7 @@ class Scene:
            self.track_count = max_tracks 
         vertical_offset = self.inter_track_space
         for i in range(self.track_count):
-            self.tracks.append(Track(self.screen, self.content_height, self.screen.width(), 0, vertical_offset, self.get_color((0, 0, 0))))
+            self.tracks.append(Track(self.screen, self.content_height, self.screen.width(), 0, vertical_offset, self.screen.color((0, 0, 0))))
             vertical_offset += self.inter_track_space + self.content_height
 
     def frame(self):
@@ -96,13 +89,13 @@ class TextOnlyScene(Scene):
             content_glyph = []
             for pos in glyph:
                 if not pos:
-                   content_glyph.append(self.get_color((0, 0, 0)))
+                   content_glyph.append(self.screen.color((0, 0, 0)))
                 else:
-                   content_glyph.append(self.get_color(color))
+                   content_glyph.append(self.screen.color(color))
             content += content_glyph
-            content += [ self.get_color((0, 0, 0)) for _ in range(font["height"]) ]
+            content += [ self.screen.color((0, 0, 0)) for _ in range(font["height"]) ]
         for _ in range(self.wrap_around_space):
-            content += [ self.get_color((0, 0, 0)) for _ in range(font["height"]) ]
+            content += [ self.screen.color((0, 0, 0)) for _ in range(font["height"]) ]
         return content
 
     def add_text_to_track(self, value, track_id, color=(255,255,255)):

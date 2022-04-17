@@ -1,12 +1,13 @@
 from rich import print as rprint
 from rich.console import Console
+from led_grid.hw.screens.screen import Screen
 import datetime
 
-class VirtualScreen:
+class VirtualScreen(Screen):
     def __init__(self, height, width):
         self.width_v = width
         self.height_v = height
-        self.screen = [ [ (0, 0, 0) for _ in range(self.width_v) ] for _ in range(self.height_v) ]
+        self.screen = [ [ "rgb(0,0,0)" for _ in range(self.width_v) ] for _ in range(self.height_v) ]
         self.last_refresh = "NA"
         self.console = Console()
     
@@ -17,9 +18,9 @@ class VirtualScreen:
     def height(self):
         return self.height_v
 
-    def is_virtual(self):
-        return True
-        
+    def color(self, color_tuple):
+        return f"rgb({color_tuple[0]},{color_tuple[1]},{color_tuple[2]})"
+
     def show(self, debug=False):
         self.console.clear()
         if debug:
@@ -33,7 +34,7 @@ class VirtualScreen:
                    else:
                        end_row = ""
                    self.console.print("◘",
-                                      style=f"rgb({color[0]},{color[1]},{color[2]})",
+                                      style=color,
                                       end=end_row)
            self.console.print(f"Screen dimensions: {self.height_v} x {self.height_v}, Refreshed: {self.last_refresh}")
 

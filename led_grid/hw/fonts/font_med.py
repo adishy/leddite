@@ -1,4 +1,4 @@
-font_med = {
+FontMed = {
   "name": "terminal_clear_med",
   "kerning": 1,
   "height": 7,
