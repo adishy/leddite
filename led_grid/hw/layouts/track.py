@@ -62,7 +62,7 @@ class Track:
                                       self.get_contents(contents_x_val, y),
                                       False)
         self.changed_after_last_write = False
-        self.screen.refresh()
+        self.screen.mark_changed()
         return True
 
 

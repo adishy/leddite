@@ -1,68 +1,46 @@
 from led_grid.hw.layouts.track import Track
-from led_grid.hw.fonts.font import font_med
-
-from virtual_screen import VirtualScreen
-from scene import TextOnlyScene
-from rpi_ws281x import Color
-from screen import Screen
+from led_grid.hw.contexts.context import Context
+from led_grid.hw.layouts.scene import TextOnlyScene
 import datetime
 import sys
 import time
 
 class Clock(Context):
-    
-def clock(screen):
-    change = True
-    screen_height = screen.height()
-    screen_width =  screen.width()
-    scene = TextOnlyScene(screen=screen, inter_track_space=1)
-    scene.generate_tracks()
-    scene.tracks[0].do_not_scroll = True
-    second = None
-    prev_second = None
+    def __init__(self, screen):
+        super().__init__(screen)
+        self.scene = TextOnlyScene(screen=self.screen, inter_track_space=1)
+        self.scene.generate_tracks()
+        self.scene.tracks[0].do_not_scroll = True
 
-    print(scene.tracks)
+    def show(self):
+        self.switch_context = False
+        self.switch_ready = False
+        change = True
+        screen_height = self.screen.height()
+        screen_width =  self.screen.width()
+        second = None
+        prev_second = None
+
+        self.switch_ready = False
+        while not self.switch_context:
+            current = datetime.datetime.now()
+            current_hr = current.strftime("%H")
+            current_min = current.strftime("%M")
+
+            if change:
+                current_hr = current_hr + ":"
+            change = not change
+            self.scene.clear_tracks(0)
+            scene.add_text_to_track(current_hr, 0)        
+
+            if current_min != scene.track_value(1):
+                self.scene.clear_tracks(1)
+                self.scene.add_text_to_track(current_min, 1, (233, 75, 60))        
+
+            self.scene.frame()
+            time.sleep(1)
+        self.ready_switch = True
+
  
-    while True:
-        current = datetime.datetime.now()
-        current_hr = current.strftime("%H")
-        current_min = current.strftime("%M")
-
-        if change:
-            current_hr = current_hr + ":"
-        change = not change
-        scene.clear_tracks(0)
-        scene.add_text_to_track(current_hr, 0)        
-
-        if current_min != scene.track_value(1):
-            scene.clear_tracks(1)
-            scene.add_text_to_track(current_min, 1, (233, 75, 60))        
-
-        scene.frame()
-
-        time.sleep(1)
-
-def main(screen):
-    clock(screen)
-
-if __name__ == '__main__':
-    if "-h" in sys.argv or "--help" in sys.argv:
-        show_usage()
-        exit(0)
-    test_virtual_screen = False
-    screen_height = 16
-    screen_width = 16
-    if "--virtual" in sys.argv:
-        index = sys.argv.index("--virtual")
-        if len(sys.argv) < 4 or len(sys.argv[index::]) < 3:
-            show_usage()
-            exit(1)
-        test_virtual_screen = True
-        screen_height = int(sys.argv[index + 1])
-        screen_width = int(sys.argv[index + 2])
-        screen = VirtualScreen(screen_height, screen_width)
-    else:
-        screen = Screen()
-    main(screen)
-
-
+    def desc(self):
+        return "Clock"

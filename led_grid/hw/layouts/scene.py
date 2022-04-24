@@ -1,5 +1,5 @@
 from led_grid.hw.layouts.track import Track
-from led_grid.hw.fonts import font_med
+from led_grid.hw.fonts.font_med import FontMed
 from led_grid.hw.screens import *
 import sys
 import time
@@ -69,7 +69,7 @@ class TextOnlyScene(Scene):
         self.wrap_around_space = 3
         if "wrap_around_space" in kwargs:
             self.wrap_around_space = kwargs["wrap_around_space"]
-        self.font = font_med
+        self.font = FontMed
         if "font" in kwargs:
             self.font = kwargs["font"]
         s_args["content_height"] = self.font["height"]
