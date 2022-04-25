@@ -21,5 +21,5 @@ def run(port, virtual=True, h=16, w=16):
         led_grid.screen = led_grid.hw.screens.PhysicalScreen()
     #led_grid.screen_thread = Thread(target=show)
     #led_grid.screen_thread.start()
-    app.run(debug=True, port=port, use_reloader=False)
+    app.run(debug=True, host='0.0.0.0', port=port, use_reloader=False)
    
