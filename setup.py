@@ -11,6 +11,7 @@ setup(
         ],
     },
     install_requires=[
+        'docopt',
         'imageio',
         'arrow==0.15.5',
         'bs4==0.0.1',
