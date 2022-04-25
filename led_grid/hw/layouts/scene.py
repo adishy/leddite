@@ -82,7 +82,7 @@ class TextOnlyScene(Scene):
         
     def generate_text(self, value, color=(255,255,255), font=None):
         if font is None:
-            font = font_med
+            font = FontMed
         content = []
         for symbol in value:
             glyph = self.glyph_to_col_major(font["symbols"][symbol], font)

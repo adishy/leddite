@@ -5,8 +5,6 @@ import datetime
 
 class VirtualScreen(Screen):
     def __init__(self, height, width):
-        super().__init__()
-        self.state_change = False
         self.width_v = width
         self.height_v = height
         self.screen = [ [ "rgb(0,0,0)" for _ in range(self.width_v) ] for _ in range(self.height_v) ]

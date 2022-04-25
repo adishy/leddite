@@ -3,13 +3,12 @@ from threading import Thread, Event
 class Context:
     def __init__(self, screen):
         self.screen = screen
-        self.switch_ready = False
-        self.switch_context = False
-        self.switch_ready = False
 
     prev_context = None
     active_context = None
     active_context_thread = None
+    context_changed = Event()
+    running_context_done = Event()
 
     @classmethod
     def set_context(cls, new_context):
@@ -26,22 +25,25 @@ class Context:
     
     @classmethod
     def __switch(cls, new_context):
-       cls.active_context.signal_switch()
-       while not cls.active_context.ready_to_switch():
-           pass 
+       cls.context_changed.set()
+       cls.running_context_done.wait()
+       print("in switching context")
+       cls.running_context_done.clear()
+       cls.context_changed.clear()
        cls.__set_new_context(new_context)
-  
+
+    @classmethod
+    def __indicate(cls):
+        cls.need_to_switch = True
+
     def show(self):
         pass
 
-    def signal_switch(self):
-        self.switch_context = True
-
-    def ready_to_switch(self):
-        return self.switch_ready
-
+    def name(self):
+        return "Default Context"
+    
     def desc(self):
-        return "Context"
+        return "This is the Default Context"
 
     def restore(self):
         pass

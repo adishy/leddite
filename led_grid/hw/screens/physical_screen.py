@@ -5,7 +5,6 @@ import time
 
 class PhysicalScreen(Screen):
    def __init__(self):
-      super().__init__()
       # LED strip configuration:
       self.LED_ROWS       = 16
       self.LED_COLUMNS    = 16
@@ -92,7 +91,6 @@ class PhysicalScreen(Screen):
 
    def refresh(self):
       self.strip.show()
-      super().refresh()
 
 if __name__ == "__main__":
     grid = Screen()

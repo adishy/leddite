@@ -1,11 +1,6 @@
-from threading import Condition, Lock
-
 class Screen:
    def __init__(self):
-      lock = Lock()
-      self.lock = lock
-      self.cv = Condition(lock=lock)
-      self.stage_change = False
+      pass
       
    def height(self):
       return -1
@@ -25,13 +20,6 @@ class Screen:
    def clear(self):
         pass
 
-   def changed(self):
-        return self.state_change
-
-   def mark_changed(self):
-        with self.cv:
-            self.state_change = True
-            self.cv.notify()
- 
    def refresh(self):
-        self.state_change = False
+        pass
+        #self.state_change = False
