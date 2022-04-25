@@ -37,7 +37,7 @@ class PhysicalScreen(Screen):
       return self.LED_COLUMNS
 
    def color(self, color_tuple):
-        return Color(color[0], color[1], color[2])
+        return Color(color_tuple[0], color_tuple[1], color_tuple[2])
 
    def set_pixel(self, x, y, color, refresh_grid = True):
       if x < 0 or x > self.LED_ROWS - 1:
