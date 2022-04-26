@@ -19,7 +19,7 @@ class Clock(Context):
         second = None
         prev_second = None
 
-        while True:
+        while not Context.context_changed.is_set():
             current = datetime.datetime.now()
             current_hr = current.strftime("%H")
             current_min = current.strftime("%M")
@@ -35,10 +35,8 @@ class Clock(Context):
                 self.scene.add_text_to_track(current_min, 1, (233, 75, 60))        
             self.scene.frame()
             time.sleep(1)
-            if Context.context_changed.is_set():
-                print("current context is changed: clock")
-                Context.running_context_done.set()
-                return
+        print("current context is changed: clock")
+        Context.running_context_done.set()
 
     def name(self):
         return "clock"

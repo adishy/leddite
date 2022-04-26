@@ -1,10 +1,10 @@
-from threading import Thread, Event
+from threading import Thread, Lock, Event
 
 class Context:
     def __init__(self, screen):
         self.screen = screen
-
-    prev_context = None
+    
+    context_switch_lock = Lock()
     active_context = None
     active_context_thread = None
     context_changed = Event()
@@ -12,10 +12,11 @@ class Context:
 
     @classmethod
     def set_context(cls, new_context):
-      cls.prev_context = cls.active_context
+      cls.context_switch_lock.acquire()
       if cls.active_context_thread:
           cls.__switch(new_context) 
       cls.__set_new_context(new_context)
+      cls.context_switch_lock.release()
 
     @classmethod
     def __set_new_context(cls, new_context): 
@@ -27,6 +28,7 @@ class Context:
     def __switch(cls, new_context):
        cls.context_changed.set()
        cls.running_context_done.wait()
+       print("Previous thread alive:", cls.active_context_thread.is_alive())
        print("in switching context")
        cls.running_context_done.clear()
        cls.context_changed.clear()

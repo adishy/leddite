@@ -8,7 +8,7 @@ class Blank(Context):
     def show(self):
        for i in range(self.screen.width()):
             for j in range(self.screen.height()):
-                self.screen.set_pixel(i, j, self.screen.color(self.background_color))
+                self.screen.set_pixel(i, j, self.screen.color(self.background_color), False)
        self.screen.refresh()
        Context.running_context_done.set()
 

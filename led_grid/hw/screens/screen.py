@@ -1,6 +1,8 @@
+from threading import Lock
+
 class Screen:
    def __init__(self):
-      pass
+      self.screen_refresh_lock = Lock()
       
    def height(self):
       return -1

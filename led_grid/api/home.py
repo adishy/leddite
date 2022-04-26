@@ -1,34 +1,23 @@
 import flask
+import re
 import led_grid
 
 @led_grid.app.route("/api/v1/home/hello_there/", methods=[ "GET" ])
 def check():
     return flask.jsonify({ "status": 200, "message": "General Kenobi" })
     
-@led_grid.app.route("/api/v1/home/toggle/", methods=[ "POST" ])
-def toggle():
-    active_context = led_grid.hw.contexts.Context.active_context
-    if active_context is None:
-        context_to_set = led_grid.hw.contexts.Blank(led_grid.screen, (255, 255, 255))
-    # If the screen is running the blank, restore the previous context
-    elif active_context.__class__.__name__ == "Blank":
-        prev_context = led_grid.hw.contexts.Context.prev_context
-        if prev_context is None:
-            return flask.jsonify({ "status": 200, "message": f"Current context is {active_context.desc()}, no prev context" })
-        else:
-            context_to_set = prev_context
-    else:
-       context_to_set = led_grid.hw.contexts.Blank(led_grid.screen) 
-    led_grid.hw.contexts.Context.set_context(context_to_set)
-    return flask.jsonify({ "status": 200, "message": f"Context switched to: {context_to_set.desc()}" })
-
 @led_grid.app.route("/api/v1/home/set_context/<name>/", methods=[ "POST" ])
 def set_context(name):
-    global check_bg_color
     if name == "clock":
         new_context = led_grid.hw.contexts.Clock(led_grid.screen)
     if name == "blank":
-        new_context = led_grid.hw.contexts.Blank(led_grid.screen, (0, 0, 0))
+        color = (0, 0, 0)
+        bg = flask.request.args.get("bg")
+        if bg is not None and bool(re.match(r"\(\d{1,3}\,\d{1,3},\d{1,3}\)", bg)):
+            r,g,b = [ int(color) for color in bg.replace(")", "").replace("(", "").split(",") ]
+            if (r >= 0 and r < 256) and (g >= 0 and g < 256) and (b >= 0 and b < 256):
+                color = (r, g, b)
+        new_context = led_grid.hw.contexts.Blank(led_grid.screen, color)
     led_grid.hw.contexts.Context.set_context(new_context)
     
     return flask.jsonify({ "status": 200, "context": name })
