@@ -5,7 +5,6 @@ import time
 
 class PhysicalScreen(Screen):
    def __init__(self):
-      super().__init__()
       # LED strip configuration:
       self.LED_ROWS       = 16
       self.LED_COLUMNS    = 16
@@ -41,7 +40,8 @@ class PhysicalScreen(Screen):
         return Color(color_tuple[0], color_tuple[1], color_tuple[2])
 
    def set_pixel(self, x, y, color, refresh_grid = True):
-      self.screen_refresh_lock.acquire()
+      if not self.permission():
+         return 
       if x < 0 or x > self.LED_ROWS - 1:
         raise "Invalid row"
       if y < 0 or y > self.LED_COLUMNS - 1:
@@ -54,7 +54,6 @@ class PhysicalScreen(Screen):
       self.strip.setPixelColor(position_in_grid, color)
       if refresh_grid:
          self.strip.show()
-      self.screen_refresh_lock.release()
 
    def set_pixel_rgb(self, x, y, r, g, b, refresh_grid = True):
       self.set_pixel(x, y, Color(r, g, b), refresh_grid)
@@ -93,9 +92,9 @@ class PhysicalScreen(Screen):
       self.overwrite_image(blank_image)
 
    def refresh(self):
-      self.screen_refresh_lock.acquire()
+      if not self.permission():
+         return 
       self.strip.show()
-      self.screen_refresh_lock.release() 
 
 if __name__ == "__main__":
     grid = Screen()

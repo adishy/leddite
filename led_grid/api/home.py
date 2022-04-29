@@ -1,5 +1,6 @@
 import flask
 import re
+import threading
 import led_grid
 
 @led_grid.app.route("/api/v1/home/hello_there/", methods=[ "GET" ])
@@ -37,4 +38,18 @@ def active_context():
                            "description": context_desc
                          })
     
+@led_grid.app.route("/api/v1/home/context_threads/", methods=[ "GET" ])
+def active_context_threads():
+    active_context_thread_uid = "No active context thread"
+    active_context = led_grid.hw.contexts.Context.active_context
+    if active_context:
+        active_context_thread_uid = active_context.thread_uid()
+    return flask.jsonify({
+                           "screen_active_context_thread": led_grid.hw.screens.Screen.thread_uid,
+                           "active_context_thread_name": active_context_thread_uid,
+                           "all_threads": [ thread.name for thread in threading.enumerate() ],
+                           "status": 200,
+                         })
 
+    
+    

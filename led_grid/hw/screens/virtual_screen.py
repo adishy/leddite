@@ -5,7 +5,6 @@ import datetime
 
 class VirtualScreen(Screen):
     def __init__(self, height, width):
-        super().__init__()
         self.width_v = width
         self.height_v = height
         self.screen = [ [ "rgb(0,0,0)" for _ in range(self.width_v) ] for _ in range(self.height_v) ]
@@ -39,15 +38,15 @@ class VirtualScreen(Screen):
            self.console.print(f"Screen dimensions: {self.height_v} x {self.height_v}, Refreshed: {self.last_refresh}")
 
     def set_pixel(self, y, x, color, refresh_grid=True):
-        self.screen_refresh_lock.acquire()
+        if not self.permission():
+            return 
         self.screen[x][y] = color
-        self.screen_refresh_lock.release()
 
     def refresh(self, debug=False):
-        self.screen_refresh_lock.acquire()
+        if not self.permission():
+            return 
         self.last_refresh = datetime.datetime.now()
         self.show(debug)
-        self.screen_refresh_lock.release()
 
     def __repr__(self):
         screen_diagram = ""

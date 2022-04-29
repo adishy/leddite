@@ -1,9 +1,14 @@
 from threading import Lock
+import sys
+import threading
 
 class Screen:
    def __init__(self):
-      self.screen_refresh_lock = Lock()
-      
+     pass 
+
+   switcher_lock = Lock()
+   thread_uid = None
+ 
    def height(self):
       return -1
 
@@ -16,12 +21,17 @@ class Screen:
    def context(self):
       return self.active_context
 
+   def permission(self):
+      check_permission = threading.current_thread().name == Screen.thread_id
+      if not check_permission:
+        print(f"I tried to write to the screen with no permission: Me: {threading.current_thread().name}. Current: {Screen.thread_uid} Bad Dobby!", file=sys.stderr)
+      return check_permission
+
    def set_pixel(self, x, y, color, refresh_grid = True):
-        pass
+      pass
 
    def clear(self):
         pass
 
    def refresh(self):
         pass
-        #self.state_change = False

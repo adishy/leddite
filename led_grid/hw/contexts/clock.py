@@ -19,7 +19,7 @@ class Clock(Context):
         second = None
         prev_second = None
 
-        while not Context.context_changed.is_set():
+        while self.screen.permission():
             current = datetime.datetime.now()
             current_hr = current.strftime("%H")
             current_min = current.strftime("%M")
@@ -36,7 +36,6 @@ class Clock(Context):
             self.scene.frame()
             time.sleep(1)
         print("current context is changed: clock")
-        Context.running_context_done.set()
 
     def name(self):
         return "clock"

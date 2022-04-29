@@ -10,7 +10,6 @@ class Blank(Context):
             for j in range(self.screen.height()):
                 self.screen.set_pixel(i, j, self.screen.color(self.background_color), False)
        self.screen.refresh()
-       Context.running_context_done.set()
 
     def name(self):
         return "blank" 
