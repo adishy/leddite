@@ -1,3 +1,5 @@
+import sys
+
 class Track:
     def __init__(self,
                  screen,
@@ -57,8 +59,10 @@ class Track:
                     contents_x_val = x 
                 else:
                     contents_x_val = ( x + self.current_horizontal_shift ) % self.get_contents_width()
-                self.screen.set_pixel(x + self.horizontal_shift,
-                                      y + self.vertical_shift,
+                screen_x_val = min(x + self.horizontal_shift, self.screen.width() - 1)
+                screen_y_val = min(y + self.vertical_shift, self.screen.height() - 1)
+                self.screen.set_pixel(screen_x_val,
+                                      screen_y_val,
                                       self.get_contents(contents_x_val, y),
                                       False)
         self.changed_after_last_write = False

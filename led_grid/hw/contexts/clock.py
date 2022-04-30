@@ -10,8 +10,9 @@ class Clock(Context):
         super().__init__(screen)
         self.scene = TextOnlyScene(screen=self.screen, inter_track_space=1)
         self.scene.generate_tracks()
-        self.scene.tracks[0].do_not_scroll = True
-
+        for track in self.scene.tracks:
+            track.do_not_scroll = True
+        self.scene.tracks[1].horizontal_shift = 4
     def show(self):
         change = True
         screen_height = self.screen.height()
