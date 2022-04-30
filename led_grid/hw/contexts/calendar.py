@@ -19,9 +19,9 @@ class Calendar(Context):
         for track in self.med_text_scene.tracks:
             track.do_not_scroll = True
         self.med_text_scene.tracks[0].horizontal_shift = 2 
-        self.small_text_scene.tracks[2].horizontal_shift = 1
+        self.small_text_scene.tracks[2].horizontal_shift = 2
         self.small_text_scene.tracks[2].vertical_shift -= 1
-        self.small_text_scene.tracks[3].horizontal_shift = 1
+        self.small_text_scene.tracks[3].horizontal_shift = 2
 
     def show(self):
         while self.screen.permission():
