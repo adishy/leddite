@@ -60,7 +60,9 @@ class Track:
                 else:
                     contents_x_val = ( x + self.current_horizontal_shift ) % self.get_contents_width()
                 screen_x_val = min(x + self.horizontal_shift, self.screen.width() - 1)
+                screen_x_val = max(screen_x_val, 0)
                 screen_y_val = min(y + self.vertical_shift, self.screen.height() - 1)
+                screen_y_val = max(screen_y_val, 0)
                 self.screen.set_pixel(screen_x_val,
                                       screen_y_val,
                                       self.get_contents(contents_x_val, y),

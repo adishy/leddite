@@ -11,6 +11,8 @@ def check():
 def set_context(name):
     if name == "clock":
         new_context = led_grid.hw.contexts.Clock(led_grid.screen)
+    if name == "calendar":
+        new_context = led_grid.hw.contexts.Calendar(led_grid.screen)
     if name == "blank":
         color = (0, 0, 0)
         bg = flask.request.args.get("bg")

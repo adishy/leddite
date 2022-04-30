@@ -80,7 +80,7 @@ class TextOnlyScene(Scene):
         self.track_values = [ "" for _ in range(len(self.tracks)) ]
         
         
-    def generate_text(self, value, color=(255,255,255), font=None):
+    def generate_text(self, value, color=(255,255,255), font=FontMed):
         if font is None:
             font = FontMed
         content = []
@@ -98,12 +98,12 @@ class TextOnlyScene(Scene):
             content += [ self.screen.color((0, 0, 0)) for _ in range(font["height"]) ]
         return content
 
-    def add_text_to_track(self, value, track_id, color=(255,255,255)):
+    def add_text_to_track(self, value, track_id, color=(255,255,255), font=FontMed):
         if not self.tracks:
             self.generate_tracks()
         assert(track_id >= 0 and track_id < self.max_tracks())
         assert(track_id < len(self.tracks))
-        self.tracks[track_id].add_content(self.generate_text(value, color))
+        self.tracks[track_id].add_content(self.generate_text(value, color, font))
         self.track_values[track_id] += value
 
     def clear_tracks(self, id=-1):
