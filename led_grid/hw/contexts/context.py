@@ -32,6 +32,8 @@ class Context:
         i = 0
         while not cls.stop_carousel_event.is_set():
            cls.set_context(blank_context)
+           while cls.active_context_thread.is_alive():
+             time.sleep(0.2)
            num_carousel_contexts = len(carousel_context_names)
            context_to_set = cls.context_registry[carousel_context_names[i % num_carousel_contexts]]
            cls.set_context(context_to_set)
