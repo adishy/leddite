@@ -34,7 +34,7 @@ class Calendar(Context):
 
             self.med_text_scene.add_text_to_track(day, 0, (255, 255, 255), FontMed)
             self.small_text_scene.add_text_to_track(month_name, 2,  (233, 75, 60), FontSmall)
-            self.small_text_scene.add_text_to_track(weekday, 3, (234, 84, 128), FontSmall)
+            self.small_text_scene.add_text_to_track(weekday, 3, (233, 82, 128), FontSmall)
 
             self.med_text_scene.frame()
             self.small_text_scene.frame()

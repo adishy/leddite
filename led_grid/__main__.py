@@ -5,6 +5,7 @@
   led_grid show (virtual|physical)
 """
 from docopt import docopt
+import requests
 import os
 import led_grid
 
