@@ -10,18 +10,17 @@ import time
 class Calendar(Context):
     def __init__(self, screen):
         super().__init__(screen)
-        self.small_text_scene= TextOnlyScene(screen=self.screen, inter_track_space=0, font=FontSmall)
-        self.med_text_scene= TextOnlyScene(screen=self.screen, inter_track_space=0, font=FontMed)
+        self.small_text_scene= TextOnlyScene(screen=self.screen, inter_track_space=1, font=FontSmall)
+        #self.med_text_scene= TextOnlyScene(screen=self.screen, inter_track_space=0, font=FontMed)
         self.small_text_scene.generate_tracks()
-        self.med_text_scene.generate_tracks()
+        #self.med_text_scene.generate_tracks()
         for track in self.small_text_scene.tracks:
             track.do_not_scroll = True
-        for track in self.med_text_scene.tracks:
-            track.do_not_scroll = True
-        self.med_text_scene.tracks[0].horizontal_shift = 2 
-        self.small_text_scene.tracks[2].horizontal_shift = 2
-        self.small_text_scene.tracks[2].vertical_shift -= 1
-        self.small_text_scene.tracks[3].horizontal_shift = 2
+        #for track in self.med_text_scene.tracks:
+        #    track.do_not_scroll = True
+        #self.med_text_scene.tracks[0].horizontal_shift = 2 
+        for track in self.small_text_scene.tracks:
+            track.horizontal_shift = 2
 
     def show(self):
         while self.screen.permission():
@@ -30,13 +29,13 @@ class Calendar(Context):
             month_name = datetime.datetime.now().strftime("%b").upper()
 
             self.small_text_scene.clear_tracks()
-            self.med_text_scene.clear_tracks()
+            #self.med_text_scene.clear_tracks()
 
-            self.med_text_scene.add_text_to_track(day, 0, (255, 255, 255), FontMed)
-            self.small_text_scene.add_text_to_track(month_name, 2,  (233, 75, 60), FontSmall)
-            self.small_text_scene.add_text_to_track(weekday, 3, (233, 82, 128), FontSmall)
+            self.small_text_scene.add_text_to_track(day, 0, (255, 255, 255), FontSmall)
+            self.small_text_scene.add_text_to_track(month_name, 1,(233, 75, 60), FontSmall)
+            self.small_text_scene.add_text_to_track(weekday, 2, (233, 75, 68), FontSmall)
 
-            self.med_text_scene.frame()
+            #self.med_text_scene.frame()
             self.small_text_scene.frame()
 
             time.sleep(1)

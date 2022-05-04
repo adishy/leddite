@@ -31,9 +31,9 @@ class Clock(Context):
             self.scene.clear_tracks(0)
             self.scene.add_text_to_track(current_hr, 0)        
 
-            if current_min != self.scene.track_value(1):
-                self.scene.clear_tracks(1)
-                self.scene.add_text_to_track(current_min, 1, (233, 75, 60))        
+            self.scene.clear_tracks(1)
+            self.scene.add_text_to_track(current_min, 1, (233, 75, 60))        
+
             self.scene.frame()
             time.sleep(1)
         print("current context is changed: clock")
