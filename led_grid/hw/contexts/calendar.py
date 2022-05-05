@@ -45,3 +45,6 @@ class Calendar(Context):
  
     def desc(self):
         return "Displays a calendar"
+    
+    def interval_sec(self):
+        return 2

@@ -10,9 +10,11 @@ def check():
 @led_grid.app.route("/api/v1/home/set_context/<name>/", methods=[ "POST" ])
 def set_context(name):
     if led_grid.hw.contexts.Context.carousel_thread is not None:
-        return flask.jsonify({ "status": 403, "error": "Carousel is active. Please stop carousel before manually setting context"})
+        return flask.jsonify({ "status": 403, "error": "Carousel is active. Please stop carousel before manually setting context" })
     if name == "clock":
         new_context = led_grid.hw.contexts.Clock(led_grid.screen)
+    if name == "weather":
+        new_context = led_grid.hw.contexts.Weather(led_grid.screen)
     if name == "calendar":
         new_context = led_grid.hw.contexts.Calendar(led_grid.screen)
     if name == "blank":
@@ -62,7 +64,7 @@ def start_carousel():
     if contexts is not None:
         contexts = contexts.split(",")
     else:
-        contexts = [ "clock", "calendar" ]
+        contexts = [ "clock", "calendar", "weather" ]
     if led_grid.hw.contexts.Context.start_carousel(blank_context, contexts):
         return flask.jsonify({
                                "status": 200,

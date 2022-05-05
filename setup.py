@@ -12,6 +12,7 @@ setup(
     },
     install_requires=[
         'docopt',
+        'python-dotenv',
         'imageio',
         'arrow==0.15.5',
         'bs4==0.0.1',

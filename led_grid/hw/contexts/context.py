@@ -13,7 +13,7 @@ class Context:
     context_registry = {}
     carousel_context = None
     carousel_thread = None
-    carousel_switch_interval = 5
+    carousel_switch_interval_sec = 5
     stop_carousel_event = Event()
     active_context = None
     active_context_thread = None
@@ -40,7 +40,7 @@ class Context:
            cls.carousel_context = context_to_set
            start_time = int(time.time())
            current_time = int(time.time())
-           while (current_time - start_time) <= cls.carousel_switch_interval:
+           while (current_time - start_time) <= cls.carousel_context.interval_sec():
               current_time = int(time.time())
               if cls.stop_carousel_event.is_set():
                  return True
@@ -96,5 +96,5 @@ class Context:
     def restore(self):
         pass
 
-    def switch(self, next_context):
-        pass
+    def interval_sec(self):
+        return Context.carousel_switch_interval_sec

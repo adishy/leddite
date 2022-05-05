@@ -43,3 +43,6 @@ class Clock(Context):
  
     def desc(self):
         return "Displays a clock"
+
+    def interval_sec(self):
+        return 3

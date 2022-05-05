@@ -18,6 +18,7 @@ screen = None
 def initialize_context_registry(screen):
     carousel_contexts = [
                           led_grid.hw.contexts.Clock(screen),
+                          led_grid.hw.contexts.Weather(screen),
                           led_grid.hw.contexts.Calendar(screen)
                         ]
     for context in carousel_contexts:
