@@ -16,14 +16,29 @@ screen = None
 
 
 def initialize_context_registry(screen):
-    carousel_contexts = [
-                          led_grid.hw.contexts.Clock(screen),
-                          led_grid.hw.contexts.Weather(screen),
-                          led_grid.hw.contexts.Calendar(screen)
-                        ]
-    for context in carousel_contexts:
-        led_grid.hw.contexts.Context.context_registry[context.name()] = context
-
+    def blank_context_handler(context):
+        color = (0, 0, 0)
+        bg = flask.request.args.get("bg")
+        if bg is not None and bool(re.match(r"\(\d{1,3}\,\d{1,3},\d{1,3}\)", bg)):
+            r,g,b = [ int(color) for color in bg.replace(")", "").replace("(", "").split(",") ]
+            if (r >= 0 and r < 256) and (g >= 0 and g < 256) and (b >= 0 and b < 256):
+                color = (r, g, b)
+            context.background_color = color 
+    
+    contexts_available = [
+                          { "context": led_grid.hw.contexts.Clock(screen), "handler": None },
+                          { "context": led_grid.hw.contexts.Weather(screen), "handler": None },
+                          { "context": led_grid.hw.contexts.Blank(screen), "handler": None },
+                          { "context": led_grid.hw.contexts.Calendar(screen), "handler": blank_context_handler },
+                         ]
+    
+    for context_data in contexts_available:
+        context = context_data["context"]
+        name = context.name()
+        led_grid.hw.contexts.Context.context_registry[name] = context
+        if context_data["handler"] is not None:
+            led_grid.hw.contexts.Context.context_handlers[name] = context_data["handler"]
+   
 def run(port, virtual=True, h=16, w=16):
     if virtual:
         led_grid.screen = led_grid.hw.screens.VirtualScreen(h, w)

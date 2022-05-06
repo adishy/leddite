@@ -11,22 +11,14 @@ def check():
 def set_context(name):
     if led_grid.hw.contexts.Context.carousel_thread is not None:
         return flask.jsonify({ "status": 403, "error": "Carousel is active. Please stop carousel before manually setting context" })
-    if name == "clock":
-        new_context = led_grid.hw.contexts.Clock(led_grid.screen)
-    if name == "weather":
-        new_context = led_grid.hw.contexts.Weather(led_grid.screen)
-    if name == "calendar":
-        new_context = led_grid.hw.contexts.Calendar(led_grid.screen)
-    if name == "blank":
-        color = (0, 0, 0)
-        bg = flask.request.args.get("bg")
-        if bg is not None and bool(re.match(r"\(\d{1,3}\,\d{1,3},\d{1,3}\)", bg)):
-            r,g,b = [ int(color) for color in bg.replace(")", "").replace("(", "").split(",") ]
-            if (r >= 0 and r < 256) and (g >= 0 and g < 256) and (b >= 0 and b < 256):
-                color = (r, g, b)
-        new_context = led_grid.hw.contexts.Blank(led_grid.screen, color)
+    if name in led_grid.hw.contexts.Context.context_registry:
+        new_context = led_grid.hw.contexts.Context.context_registry[name]
+        if name in led_grid.hw.contexts.Context.context_handlers:
+            context_handler = led_grid.hw.contexts.Context.context_handlers[name]
+            context_handler(new_context)
+    else:
+        return flask.jsonify({ "status": 403, "error": "Could not find specified context by the context name" })
     led_grid.hw.contexts.Context.set_context(new_context)
-    
     return flask.jsonify({ "status": 200, "context": name })
     
 @led_grid.app.route("/api/v1/home/active_context/", methods=[ "GET" ])

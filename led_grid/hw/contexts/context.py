@@ -11,6 +11,7 @@ class Context:
         self.screen = screen
 
     context_registry = {}
+    context_handlers = {}
     carousel_context = None
     carousel_thread = None
     carousel_switch_interval_sec = 5

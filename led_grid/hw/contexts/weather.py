@@ -43,6 +43,7 @@ class Weather(Context):
     def update(self, override=False):
         current = int(time.time())
         if override or self.weather_data is None or (current - self.last_update >= self.update_interval_sec):
+            self.last_update = current
             self.weather_data = self.retrieve_weather() 
             print(json.dumps(self.weather_data, indent=5), file=sys.stderr)
             print("Updated weather data", file=sys.stderr)
