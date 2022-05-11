@@ -106,4 +106,29 @@ def pixel_delete_all():
                     "status_code": 200
                   }), 200
 
+def set_image(self, image):
+   #rows, columns, channels = image.shape
+   #print("Rows:", rows, "Columns:", columns, "Channels:", channels)
+   #print("Actual rows:", self.LED_ROWS, "Actual columns:", self.LED_COLUMNS)
+   #assert rows > 0 and rows <= self.LED_ROWS
+   #assert columns > 0 and columns <= self.LED_COLUMNS
+   #assert channels >= 3
+   for i, row in enumerate(self.current_grid):
+     for j, current_color_value in enumerate(row):
+          new_color_value = Color(int(image[i][j][0]), int(image[i][j][1]), int(image[i][j][2]))
+          if current_color_value != new_color_value:
+              self.current_grid[i][j] = new_color_value 
+              self.set_pixel(i, j, new_color_value, False)
+   self.strip.show()
+
+def overwrite_image(self, image):
+   for i, row in enumerate(image):
+      for j, value in enumerate(row):
+          new_color_value = Color(int(image[i][j][0]), int(image[i][j][1]), int(image[i][j][2]))
+          self.set_pixel(i, j, new_color_value, False)
+   self.strip.show()
+
+def read_image(self, path):
+   image = imageio.imread(path)
+   self.overwrite_image(image)
 

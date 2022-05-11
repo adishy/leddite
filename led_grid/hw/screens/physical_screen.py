@@ -55,41 +55,15 @@ class PhysicalScreen(Screen):
       if refresh_grid:
          self.strip.show()
 
-   def set_pixel_rgb(self, x, y, r, g, b, refresh_grid = True):
-      self.set_pixel(x, y, Color(r, g, b), refresh_grid)
-
-   def set_image(self, image):
-      #rows, columns, channels = image.shape
-      #print("Rows:", rows, "Columns:", columns, "Channels:", channels)
-      #print("Actual rows:", self.LED_ROWS, "Actual columns:", self.LED_COLUMNS)
-      #assert rows > 0 and rows <= self.LED_ROWS
-      #assert columns > 0 and columns <= self.LED_COLUMNS
-      #assert channels >= 3
-      for i, row in enumerate(self.current_grid):
-        for j, current_color_value in enumerate(row):
-             new_color_value = Color(int(image[i][j][0]), int(image[i][j][1]), int(image[i][j][2]))
-             if current_color_value != new_color_value:
-                 self.current_grid[i][j] = new_color_value 
-                 self.set_pixel(i, j, new_color_value, False)
-      self.strip.show()
-
-   def overwrite_image(self, image):
-      for i, row in enumerate(image):
-         for j, value in enumerate(row):
-             new_color_value = Color(int(image[i][j][0]), int(image[i][j][1]), int(image[i][j][2]))
-             self.set_pixel(i, j, new_color_value, False)
-      self.strip.show()
-   
-   def read_image(self, path):
-      image = imageio.imread(path)
-      self.overwrite_image(image)
-
    def is_virtual(self):
       return False
  
    def clear_grid(self):
       blank_image = [ [ (0, 0, 0) for value in range(self.LED_COLUMNS) ] for row in range(self.LED_ROWS) ] 
-      self.overwrite_image(blank_image)
+      for row in range(self.LED_ROWS):
+         for col in range(self.LED_COLUMNS):
+            self.set_pixel(row, col, (0, 0, 0), False)
+      self.strip.show()
 
    def refresh(self):
       if not self.permission():

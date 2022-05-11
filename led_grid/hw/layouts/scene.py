@@ -66,6 +66,7 @@ class TextOnlyScene(Scene):
         '''
         s_args = kwargs
         self.track_values = []
+        self.track_fonts = []
         self.wrap_around_space = 3
         if "wrap_around_space" in kwargs:
             self.wrap_around_space = kwargs["wrap_around_space"]
@@ -78,11 +79,16 @@ class TextOnlyScene(Scene):
     def generate_tracks(self, track_count=-1):
         super().generate_tracks(track_count)
         self.track_values = [ "" for _ in range(len(self.tracks)) ]
-        
-        
-    def generate_text(self, value, color=(255,255,255), font=FontMed):
-        if font is None:
-            font = FontMed
+        self.track_fonts = [ self.font for _ in range(len(self.tracks)) ]
+    
+    def set_font_for_track(track_id, font):
+        assert(track_id >= 0 and track_id < self.max_tracks())
+        assert(track_id < len(self.tracks))
+        self.track_fonts[track_id] = font
+        self.tracks[track_id].height = font["height"]
+    
+    def generate_text(self, value, track_id, color=(255,255,255)):
+        font = self.track_fonts[track_id]
         content = []
         for symbol in value:
             glyph = self.glyph_to_col_major(font["symbols"][symbol], font)
@@ -98,12 +104,12 @@ class TextOnlyScene(Scene):
             content += [ self.screen.color((0, 0, 0)) for _ in range(font["height"]) ]
         return content
 
-    def add_text_to_track(self, value, track_id, color=(255,255,255), font=FontMed):
+    def add_text_to_track(self, value, track_id, color=(255,255,255)):
         if not self.tracks:
             self.generate_tracks()
         assert(track_id >= 0 and track_id < self.max_tracks())
         assert(track_id < len(self.tracks))
-        self.tracks[track_id].add_content(self.generate_text(value, color, font))
+        self.tracks[track_id].add_content(self.generate_text(value, track_id, color))
         self.track_values[track_id] += value
 
     def clear_tracks(self, id=-1):
