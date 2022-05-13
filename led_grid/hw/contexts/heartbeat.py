@@ -18,7 +18,6 @@ class Heartbeat(Context):
         self.scene = TextOnlyScene(screen=self.screen, inter_track_space=1)
         self.scene.generate_tracks()
         self.scene.set_font_for_track(0, HeartSymbol)
-        self.scene.add_text_to_track("♥", 0, (228, 57, 52))
         self.scene.set_font_for_track(1, FontSmall)
         self.scene.tracks[1].do_not_scroll = True
         self.scene.tracks[0].horizontal_shift += 1
@@ -52,7 +51,8 @@ class Heartbeat(Context):
     def write_heartbeat_data_to_tracks(self): 
         self.update()
         heart_rate = self.heartbeat_data["heart_rate"]
-        self.scene.clear_tracks(1)
+        self.scene.clear_tracks()
+        self.scene.add_text_to_track("♥", 0, (228, 57, 52))
         self.scene.add_text_to_track(f"{heart_rate}", 1)
 
     def show(self):
