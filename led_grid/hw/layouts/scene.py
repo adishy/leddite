@@ -81,7 +81,7 @@ class TextOnlyScene(Scene):
         self.track_values = [ "" for _ in range(len(self.tracks)) ]
         self.track_fonts = [ self.font for _ in range(len(self.tracks)) ]
     
-    def set_font_for_track(track_id, font):
+    def set_font_for_track(self, track_id, font):
         assert(track_id >= 0 and track_id < self.max_tracks())
         assert(track_id < len(self.tracks))
         self.track_fonts[track_id] = font

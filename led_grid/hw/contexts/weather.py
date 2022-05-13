@@ -1,6 +1,8 @@
 from led_grid.hw.layouts.track import Track
 from led_grid.hw.contexts.context import Context
 from led_grid.hw.layouts.scene import TextOnlyScene
+from led_grid.hw.fonts.font_med import FontMed
+from led_grid.hw.fonts.font_small import FontSmall
 from dotenv import load_dotenv
 from os import environ as env
 import requests
@@ -14,6 +16,9 @@ class Weather(Context):
         super().__init__(screen)
         self.scene = TextOnlyScene(screen=self.screen, inter_track_space=1)
         self.scene.generate_tracks()
+        self.scene.set_font_for_track(1, FontSmall)
+        self.scene.tracks[0].vertical_shift += 2
+        self.scene.tracks[1].vertical_shift += 2
         self.scene.tracks[0].do_not_scroll = True
         load_dotenv()
         self.api_base_url = "https://api.openweathermap.org/data/2.5/weather"
@@ -53,7 +58,7 @@ class Weather(Context):
     def write_weather_data_to_tracks(self): 
         self.update()
         temp = self.weather_data["main"]["feels_like"]
-        desc = self.weather_data["weather"][0]["main"].lower()
+        desc = self.weather_data["weather"][0]["main"].upper()
         self.scene.clear_tracks()
         self.scene.add_text_to_track(f"{int(temp)}°", 0)
         self.scene.add_text_to_track(desc, 1, (233, 75, 60))
