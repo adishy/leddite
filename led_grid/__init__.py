@@ -28,8 +28,9 @@ def initialize_context_registry(screen):
     contexts_available = [
                           { "context": led_grid.hw.contexts.Clock(screen), "handler": None },
                           { "context": led_grid.hw.contexts.Weather(screen), "handler": None },
-                          { "context": led_grid.hw.contexts.Blank(screen), "handler": None },
-                          { "context": led_grid.hw.contexts.Calendar(screen), "handler": blank_context_handler },
+                          { "context": led_grid.hw.contexts.Blank(screen), "handler": blank_context_handler },
+                          { "context": led_grid.hw.contexts.Calendar(screen), "handler": None },
+                          { "context": led_grid.hw.contexts.Heartbeat(screen), "handler": None },
                          ]
     
     for context_data in contexts_available:

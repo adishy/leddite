@@ -17,8 +17,7 @@ class Weather(Context):
         self.scene = TextOnlyScene(screen=self.screen, inter_track_space=1)
         self.scene.generate_tracks()
         self.scene.set_font_for_track(1, FontSmall)
-        self.scene.tracks[0].vertical_shift += 2
-        self.scene.tracks[1].vertical_shift += 2
+        self.scene.tracks[1].vertical_shift += 1
         self.scene.tracks[0].do_not_scroll = True
         load_dotenv()
         self.api_base_url = "https://api.openweathermap.org/data/2.5/weather"
