@@ -56,7 +56,7 @@ def start_carousel():
     if contexts is not None:
         contexts = contexts.split(",")
     else:
-        contexts = [ "clock", "calendar", "weather" ]
+        contexts = [ "clock", "calendar", "weather", "heartbeat" ]
     if led_grid.hw.contexts.Context.start_carousel(blank_context, contexts):
         return flask.jsonify({
                                "status": 200,
