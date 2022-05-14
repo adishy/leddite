@@ -3,7 +3,7 @@ from led_grid.hw.contexts.context import Context
 from led_grid.hw.layouts.scene import TextOnlyScene
 from led_grid.hw.fonts import FontMed
 from led_grid.hw.fonts import FontSmall
-from led_grid.hw.fonts import HeartSymbol
+from led_grid.hw.fonts import HeartSymbolSmaller
 from dotenv import load_dotenv
 from os import environ as env
 import requests
@@ -17,11 +17,14 @@ class Heartbeat(Context):
         super().__init__(screen)
         self.scene = TextOnlyScene(screen=self.screen, inter_track_space=1)
         self.scene.generate_tracks()
-        self.scene.set_font_for_track(0, HeartSymbol)
+        self.scene.set_font_for_track(0, HeartSymbolSmaller)
         self.scene.set_font_for_track(1, FontSmall)
+        self.scene.tracks[0].do_not_scroll = True
+        self.scene.tracks[0].vertical_shift -= 1
+        self.scene.tracks[1].vertical_shift -= 4 
+        self.scene.tracks[1].horizontal_shift += 4 
         self.scene.tracks[1].do_not_scroll = True
-        self.scene.tracks[0].horizontal_shift += 1
-        self.scene.tracks[1].horizontal_shift += 1
+        
         load_dotenv()
         self.last_update = int(time.time())
         self.update_interval_sec = 120
@@ -52,8 +55,10 @@ class Heartbeat(Context):
         self.update()
         heart_rate = self.heartbeat_data["heart_rate"]
         self.scene.clear_tracks()
+        FontSmall["kerning"] = 0
         self.scene.add_text_to_track("♥", 0, (228, 57, 52))
         self.scene.add_text_to_track(f"{heart_rate}", 1)
+        FontSmall["kerning"] = 1
 
     def show(self):
         while self.screen.permission():

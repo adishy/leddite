@@ -87,7 +87,7 @@ class TextOnlyScene(Scene):
         self.track_fonts[track_id] = font
         self.tracks[track_id].height = font["height"]
     
-    def generate_text(self, value, track_id, color=(255,255,255)):
+    def generate_text(self, value, track_id, color=(255,255,255), blank_color=(0,0,0)):
         font = self.track_fonts[track_id]
         content = []
         for symbol in value:
@@ -95,11 +95,12 @@ class TextOnlyScene(Scene):
             content_glyph = []
             for pos in glyph:
                 if not pos:
-                   content_glyph.append(self.screen.color((0, 0, 0)))
+                   content_glyph.append(self.screen.color(blank_color))
                 else:
                    content_glyph.append(self.screen.color(color))
             content += content_glyph
-            content += [ self.screen.color((0, 0, 0)) for _ in range(font["height"]) ]
+            for _ in range(font["kerning"]): 
+                content += [ self.screen.color(blank_color) for _ in range(font["height"]) ]
         for _ in range(self.wrap_around_space):
             content += [ self.screen.color((0, 0, 0)) for _ in range(font["height"]) ]
         return content

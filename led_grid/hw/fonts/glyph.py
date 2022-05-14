@@ -15,3 +15,22 @@ HeartSymbol = {
          ],
   }
 }
+
+HeartSymbolSmaller = {
+  "name": "heart_symbol_smaller",
+  "kerning": 0,
+  "height": 6,
+  "width": 5,
+  "symbols": {
+    "♥": [ 
+            0, 1, 0, 1, 0, 
+            1, 1, 1, 1, 1, 
+            1, 1, 1, 1, 1, 
+            1, 1, 1, 1, 1, 
+            0, 1, 1, 1, 0, 
+            0, 0, 1, 0, 0, 
+            0, 0, 1, 0, 0, 
+         ],
+  }
+}
+
