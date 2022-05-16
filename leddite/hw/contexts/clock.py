@@ -1,6 +1,6 @@
-from led_grid.hw.layouts.track import Track
-from led_grid.hw.contexts.context import Context
-from led_grid.hw.layouts.scene import TextOnlyScene
+from leddite.hw.layouts.track import Track
+from leddite.hw.contexts.context import Context
+from leddite.hw.layouts.scene import TextOnlyScene
 import datetime
 import sys
 import time

@@ -1,8 +1,8 @@
-from led_grid.hw.layouts.track import Track
-from led_grid.hw.contexts.context import Context
-from led_grid.hw.layouts.scene import TextOnlyScene
-from led_grid.hw.fonts.font_med import FontMed
-from led_grid.hw.fonts.font_small import FontSmall
+from leddite.hw.layouts.track import Track
+from leddite.hw.contexts.context import Context
+from leddite.hw.layouts.scene import TextOnlyScene
+from leddite.hw.fonts.font_med import FontMed
+from leddite.hw.fonts.font_small import FontSmall
 from dotenv import load_dotenv
 from os import environ as env
 import requests

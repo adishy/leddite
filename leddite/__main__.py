@@ -1,9 +1,9 @@
 """
 Usage:    
-    led_grid serve [--port=<port>] [--screen_type=(virtual|physical)] [--height=<virtual_screen_height>] [--width=<virtual_screen_width>] [--hostname=<hostname>] [--debug]
-    led_grid context set <context-name> [<context-args>] [--hostname=<hostname>] [--debug]
-    led_grid context info (all|active) [--hostname=<hostname>] [--debug]
-    led_grid carousel (start|stop|info) [--hostname=<hostname>] [--debug]
+    leddite serve [--port=<port>] [--screen_type=(virtual|physical)] [--height=<virtual_screen_height>] [--width=<virtual_screen_width>] [--hostname=<hostname>] [--debug]
+    leddite context set <context-name> [<context-args>] [--hostname=<hostname>] [--debug]
+    leddite context info (all|active) [--hostname=<hostname>] [--debug]
+    leddite carousel (start|stop|info) [--hostname=<hostname>] [--debug]
 """
 from docopt import docopt
 import requests
@@ -11,7 +11,7 @@ import json
 import sys
 import urllib.parse
 import os
-import led_grid
+import leddite
 
 def api(**kwargs):
     endpoints = {
@@ -103,7 +103,7 @@ def main():
             virtual_screen = False 
         if arguments['--port']:
             port = int(arguments['--port'])
-        led_grid.run(port, virtual_screen, virtual_screen_height, virtual_screen_width)
+        leddite.run(port, virtual_screen, virtual_screen_height, virtual_screen_width)
    
     hostname = arguments['--hostname'] 
     if not hostname:

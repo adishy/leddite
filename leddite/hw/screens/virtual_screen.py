@@ -1,6 +1,6 @@
 from rich import print as rprint
 from rich.console import Console
-from led_grid.hw.screens.screen import Screen
+from leddite.hw.screens.screen import Screen
 import datetime
 
 class VirtualScreen(Screen):

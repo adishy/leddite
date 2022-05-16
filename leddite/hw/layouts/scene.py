@@ -1,6 +1,6 @@
-from led_grid.hw.layouts.track import Track
-from led_grid.hw.fonts.font_med import FontMed
-from led_grid.hw.screens import *
+from leddite.hw.layouts.track import Track
+from leddite.hw.fonts.font_med import FontMed
+from leddite.hw.screens import *
 import sys
 import time
 

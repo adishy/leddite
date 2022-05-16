@@ -1,9 +1,9 @@
-from led_grid.hw.layouts.track import Track
-from led_grid.hw.contexts.context import Context
-from led_grid.hw.layouts.scene import TextOnlyScene
-from led_grid.hw.fonts import FontMed
-from led_grid.hw.fonts import FontSmall
-from led_grid.hw.fonts import HeartSymbolSmaller
+from leddite.hw.layouts.track import Track
+from leddite.hw.contexts.context import Context
+from leddite.hw.layouts.scene import TextOnlyScene
+from leddite.hw.fonts import FontMed
+from leddite.hw.fonts import FontSmall
+from leddite.hw.fonts import HeartSymbolSmaller
 from dotenv import load_dotenv
 from os import environ as env
 import requests

@@ -1,14 +1,14 @@
 from flask import *
-import led_grid
+import leddite
 import urllib.parse
 import time
 import tempfile
 
-@led_grid.app.route('/api/v1/', methods=['GET'])
+@leddite.app.route('/api/v1/', methods=['GET'])
 def index():
     def list_routes():
         output = []
-        for rule in led_grid.app.url_map.iter_rules():
+        for rule in leddite.app.url_map.iter_rules():
             options = {}
             for arg in rule.arguments:
                 options[arg] = "[{0}]".format(arg)
@@ -19,7 +19,7 @@ def index():
    
  
         return jsonify({
-                    "message": "led_grid /api/v1/",
+                    "message": "leddite /api/v1/",
                     "endpoints": list_routes(),
                     "status_code": 200
                    }), 200

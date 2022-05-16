@@ -1,13 +1,13 @@
 from setuptools import setup
 
 setup(
-    name='led_grid',
-    version='0.1.0',
-    packages=['led_grid'],
+    name='leddite',
+    version='0.1.9',
+    packages=['leddite'],
     include_package_data=True,
     entry_points={
         'console_scripts': [
-            'main=led_grid:main'
+            'main=leddite:main'
         ],
     },
     install_requires=[

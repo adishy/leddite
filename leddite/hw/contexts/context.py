@@ -1,4 +1,4 @@
-from led_grid.hw.screens.screen import Screen
+from leddite.hw.screens.screen import Screen
 from threading import Thread, Lock, Event
 import random
 import time

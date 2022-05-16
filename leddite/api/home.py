@@ -1,29 +1,29 @@
 import flask
 import re
 import threading
-import led_grid
+import leddite
 
-@led_grid.app.route("/api/v1/home/hello_there/", methods=[ "GET" ])
+@leddite.app.route("/api/v1/home/hello_there/", methods=[ "GET" ])
 def check():
     return flask.jsonify({ "status": 200, "message": "General Kenobi" })
     
-@led_grid.app.route("/api/v1/home/set_context/<name>/", methods=[ "POST" ])
+@leddite.app.route("/api/v1/home/set_context/<name>/", methods=[ "POST" ])
 def set_context(name):
-    if led_grid.hw.contexts.Context.carousel_thread is not None:
+    if leddite.hw.contexts.Context.carousel_thread is not None:
         return flask.jsonify({ "status": 403, "error": "Carousel is active. Please stop carousel before manually setting context" })
-    if name in led_grid.hw.contexts.Context.context_registry:
-        new_context = led_grid.hw.contexts.Context.context_registry[name]
-        if name in led_grid.hw.contexts.Context.context_handlers:
-            context_handler = led_grid.hw.contexts.Context.context_handlers[name]
+    if name in leddite.hw.contexts.Context.context_registry:
+        new_context = leddite.hw.contexts.Context.context_registry[name]
+        if name in leddite.hw.contexts.Context.context_handlers:
+            context_handler = leddite.hw.contexts.Context.context_handlers[name]
             context_handler(new_context)
     else:
         return flask.jsonify({ "status": 403, "error": "Could not find specified context by the context name" })
-    led_grid.hw.contexts.Context.set_context(new_context)
+    leddite.hw.contexts.Context.set_context(new_context)
     return flask.jsonify({ "status": 200, "context": name })
     
-@led_grid.app.route("/api/v1/home/active_context/", methods=[ "GET" ])
+@leddite.app.route("/api/v1/home/active_context/", methods=[ "GET" ])
 def active_context():
-    active_context = led_grid.hw.contexts.Context.active_context
+    active_context = leddite.hw.contexts.Context.active_context
     if active_context is None:
         context_name = "No active context"
         context_desc = "No context is currently running"
@@ -36,28 +36,28 @@ def active_context():
                            "description": context_desc
                          })
     
-@led_grid.app.route("/api/v1/home/context_threads/", methods=[ "GET" ])
+@leddite.app.route("/api/v1/home/context_threads/", methods=[ "GET" ])
 def active_context_threads():
     active_context_thread_uid = "No active context thread"
-    active_context = led_grid.hw.contexts.Context.active_context
+    active_context = leddite.hw.contexts.Context.active_context
     if active_context:
         active_context_thread_uid = active_context.thread_uid()
     return flask.jsonify({
-                           "screen_active_context_thread": led_grid.hw.screens.Screen.thread_uid,
+                           "screen_active_context_thread": leddite.hw.screens.Screen.thread_uid,
                            "active_context_thread_name": active_context_thread_uid,
                            "all_threads": [ thread.name for thread in threading.enumerate() ],
                            "status": 200,
                          })
 
-@led_grid.app.route("/api/v1/home/start_carousel/", methods=[ "POST" ])
+@leddite.app.route("/api/v1/home/start_carousel/", methods=[ "POST" ])
 def start_carousel():
-    blank_context = led_grid.hw.contexts.Blank(led_grid.screen)
+    blank_context = leddite.hw.contexts.Blank(leddite.screen)
     contexts = flask.request.args.get("contexts")
     if contexts is not None:
         contexts = contexts.split(",")
     else:
         contexts = [ "clock", "calendar", "weather", "heartbeat" ]
-    if led_grid.hw.contexts.Context.start_carousel(blank_context, contexts):
+    if leddite.hw.contexts.Context.start_carousel(blank_context, contexts):
         return flask.jsonify({
                                "status": 200,
                                "msg": f"Carousel will be started with the following contexts: {contexts}"
@@ -68,10 +68,10 @@ def start_carousel():
                                "msg": f"Carousel has already been started"
                              })
 
-@led_grid.app.route("/api/v1/home/stop_carousel/", methods=[ "POST" ])
+@leddite.app.route("/api/v1/home/stop_carousel/", methods=[ "POST" ])
 def stop_carousel():
-    blank_context = led_grid.hw.contexts.Blank(led_grid.screen)
-    if led_grid.hw.contexts.Context.stop_carousel(blank_context):
+    blank_context = leddite.hw.contexts.Blank(leddite.screen)
+    if leddite.hw.contexts.Context.stop_carousel(blank_context):
         return flask.jsonify({
                                "status": 200,
                                "msg": f"Carousel will be stopped"
@@ -82,15 +82,15 @@ def stop_carousel():
                                "msg": f"Carousel is not running"
                              })
 
-@led_grid.app.route("/api/v1/home/context_carousel/", methods=[ "GET" ])
+@leddite.app.route("/api/v1/home/context_carousel/", methods=[ "GET" ])
 def context_carousel():
-    carousel_thread_uid = led_grid.hw.contexts.Context.carousel_thread
+    carousel_thread_uid = leddite.hw.contexts.Context.carousel_thread
     if carousel_thread_uid is None:
         carousel_thread_uid = "No carousel thread"
         carousel_context = "No carousel context"
     else:
         carousel_thread_uid = carousel_thread_uid.name
-        carousel_context = led_grid.hw.contexts.Context.carousel_context.name()
+        carousel_context = leddite.hw.contexts.Context.carousel_context.name()
     return flask.jsonify({
                            "carousel_thread_name": carousel_thread_uid,
                            "carousel_context": carousel_context,
