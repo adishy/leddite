@@ -2,6 +2,37 @@ from setuptools import setup
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_desc = fh.read()
+
+# Generate requires
+
+requires = [
+  'docopt',
+  'python-dotenv',
+  'imageio',
+  'arrow==0.15.5',
+  'bs4==0.0.1',
+  'Flask',
+  'requests==2.22.0',
+  'sh==1.12.14',
+  'rich',
+ ]
+
+requires_pi = [
+  'rpi_ws281x'
+ ]
+
+# From: https://raspberrypi.stackexchange.com/a/118473
+def is_raspberrypi():
+    try:
+        with io.open('/sys/firmware/devicetree/base/model', 'r') as m:
+            if 'raspberry pi' in m.read().lower(): return True
+    except Exception: pass
+    return False
+
+if is_raspberrypi():
+    requires.append(requires_pi)
+
+# Setup leddite package metadata
 setup(
     name='leddite',
     version='0.1.9',
@@ -20,23 +51,15 @@ setup(
         "Operating System :: OS Independent",
     ],
     packages=['leddite'],
+    #package_dir={
+    #    'leddite': 'src/leddite'
+    #},
     include_package_data=True,
     entry_points={
         'console_scripts': [
             'main=leddite:main'
         ],
     },
-    install_requires=[
-        'docopt',
-        'python-dotenv',
-        'imageio',
-        'arrow==0.15.5',
-        'bs4==0.0.1',
-        'Flask',
-        'requests==2.22.0',
-        'sh==1.12.14',
-        'rich',
-        "rpi_ws281x;platform_system=='Linux'"
-    ],
+    install_requires=requires,
     python_requires=">=3.6",
 )
