@@ -26,7 +26,7 @@ class Scene:
     def max_tracks(self):        
         screen_height = self.screen.height()
         screen_width = self.screen.width()
-        assert(self.content_height < screen_height)
+        assert(self.content_height <= screen_height)
         track_count = int(screen_height / (self.content_height + self.inter_track_space))
         return track_count
 
@@ -49,6 +49,16 @@ class Scene:
            if track.get_contents_width() > self.screen.width():
                track.horizontal_shift_one()
        time.sleep(self.inter_frame_pause_sec)
+    
+    def shift_tracks_horizontal(self, shift_amount=1):
+        for track in self.tracks:
+            track.changed_after_last_write = True
+            track.horizontal_shift += shift_amount
+
+    def shift_tracks_vertical(self, shift_amount=1):
+        for track in self.tracks:
+            track.changed_after_last_write = True
+            track.vertical_shift += shift_amount
 
 class TextOnlyScene(Scene):
     def __init__(self, **kwargs):

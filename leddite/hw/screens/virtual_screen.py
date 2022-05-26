@@ -4,11 +4,12 @@ from leddite.hw.screens.screen import Screen
 import datetime
 
 class VirtualScreen(Screen):
-    def __init__(self, height, width):
+    def __init__(self, height, width, test=False):
         self.width_v = width
         self.height_v = height
         self.screen = [ [ "rgb(0,0,0)" for _ in range(self.width_v) ] for _ in range(self.height_v) ]
         self.last_refresh = "NA"
+        self.test = test
         self.console = Console()
     
     def width(self):
@@ -38,12 +39,12 @@ class VirtualScreen(Screen):
            self.console.print(f"Screen dimensions: {self.height_v} x {self.height_v}, Refreshed: {self.last_refresh}")
 
     def set_pixel(self, y, x, color, refresh_grid=True):
-        if not self.permission():
+        if not self.test and not self.permission():
             return 
         self.screen[x][y] = color
 
     def refresh(self, debug=False):
-        if not self.permission():
+        if not self.test and not self.permission():
             return 
         self.last_refresh = datetime.datetime.now()
         self.show(debug)
