@@ -131,7 +131,12 @@ class TextOnlyScene(Scene):
         height = font["height"]
         width = font["width"]
         for x in range(width):
-            col_major_glyph += [ glyph[ y * width + x ] for y in range(height) ]
+            col = [ glyph[ y * width + x ] for y in range(height) ]
+            if font["dynamic_kerning"]: 
+                if sum(col) > 0:
+                    col_major_glyph += col
+            else:
+                col_major_glyph += col
         return col_major_glyph
 
 def main(screen):

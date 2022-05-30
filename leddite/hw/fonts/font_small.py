@@ -1,6 +1,7 @@
 FontSmall = {
   "name": "terminal_clear_small",  
   "kerning": 1,  
+  "dynamic_kerning": True,
   "height": 4,  
   "width": 4,  
   "symbols": {

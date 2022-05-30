@@ -1,5 +1,6 @@
 FontMed = {
   "name": "terminal_clear_med",
+  "dynamic_kerning": True,
   "kerning": 1,
   "height": 7,
   "width": 5,

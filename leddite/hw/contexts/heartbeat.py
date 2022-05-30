@@ -55,10 +55,8 @@ class Heartbeat(Context):
         self.update()
         heart_rate = self.heartbeat_data["heart_rate"]
         self.scene.clear_tracks()
-        FontSmall["kerning"] = 0
         self.scene.add_text_to_track("♥", 0, (228, 57, 52))
         self.scene.add_text_to_track(f"{heart_rate}", 1)
-        FontSmall["kerning"] = 1
 
     def show(self):
         while self.screen.permission():
