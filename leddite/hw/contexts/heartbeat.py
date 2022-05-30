@@ -62,7 +62,7 @@ class Heartbeat(Context):
         while self.screen.permission():
             self.write_heartbeat_data_to_tracks()
             self.scene.frame()
-            time.sleep(0.15)
+            time.sleep(1)
 
     def name(self):
         return "heartbeat"
