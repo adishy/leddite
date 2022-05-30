@@ -51,8 +51,6 @@ setup(
         "Operating System :: OS Independent",
     ],
     packages=['leddite'],
-    version='0.1.8',
-    packages=['leddite'],
     include_package_data=True,
     entry_points={
         'console_scripts': [
