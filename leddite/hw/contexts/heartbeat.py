@@ -19,11 +19,12 @@ class Heartbeat(Context):
         self.scene.generate_tracks()
         self.scene.set_font_for_track(0, HeartSymbolSmaller)
         self.scene.set_font_for_track(1, FontSmall)
+        self.scene.tracks[0].width = 5
         self.scene.tracks[0].do_not_scroll = True
         self.scene.tracks[0].vertical_shift -= 1
-        self.scene.tracks[1].vertical_shift -= 4 
-        self.scene.tracks[1].horizontal_shift += 4 
-        self.scene.tracks[1].do_not_scroll = True
+        self.scene.tracks[1].width = 11
+        self.scene.tracks[1].vertical_shift -= 8 
+        self.scene.tracks[1].horizontal_shift += 5 
         
         load_dotenv()
         self.last_update = int(time.time())
