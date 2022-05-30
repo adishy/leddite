@@ -6,9 +6,10 @@ import sys
 app = flask.Flask(__name__, static_url_path='/static')  # pylint: disable=invalid-name
 app.config.from_envvar('LED_GRID_SETTINGS', silent=True)
 
-import leddite.views  # noqa: E402  pylint: disable=wrong-import-position
-import leddite.api    # noqa: E402  pylint: disable=wrong-import-position 
-import leddite.hw     # noqa: E402  pylint: disable=wrong-import-position  
+import leddite.views               # noqa: E402  pylint: disable=wrong-import-position
+import leddite.api                 # noqa: E402  pylint: disable=wrong-import-position 
+import leddite.hw                  # noqa: E402  pylint: disable=wrong-import-position  
+from leddite.cli import run_cli    # noqa: E402  pylint: disable=wrong-import-position 
 
 shut_down = False
 screen_thread = None
