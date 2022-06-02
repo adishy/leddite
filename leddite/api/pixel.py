@@ -128,7 +128,7 @@ def overwrite_image(self, image):
           self.set_pixel(i, j, new_color_value, False)
    self.strip.show()
 
-def read_image(self, path):
-   image = imageio.imread(path)
-   self.overwrite_image(image)
+#def read_image(self, path):
+#   image = imageio.imread(path)
+#   self.overwrite_image(image)
 

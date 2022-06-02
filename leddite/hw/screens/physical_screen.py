@@ -1,5 +1,5 @@
 from leddite.hw.screens.screen import Screen
-import imageio
+#import imageio
 from rpi_ws281x import *
 import time
 
