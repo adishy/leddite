@@ -35,7 +35,7 @@ if is_raspberrypi():
 # Setup leddite package metadata
 setup(
     name='leddite',
-    version='0.1.9',
+    version='0.1.11',
     author="Aditya Shylesh",
     author_email="development-mails@adishy.com",
     description="leddite lets you create your own art with Neopixel displays easily",
