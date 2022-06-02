@@ -8,7 +8,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 requires = [
   'docopt',
   'python-dotenv',
-  'imageio',
+  #'imageio',
   'arrow==0.15.5',
   'bs4==0.0.1',
   'Flask',
