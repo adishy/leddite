@@ -4,3 +4,4 @@ from leddite.hw.contexts.calendar import Calendar
 from leddite.hw.contexts.clock import Clock
 from leddite.hw.contexts.weather import Weather
 from leddite.hw.contexts.heartbeat import Heartbeat
+from leddite.hw.contexts.welcome import Welcome
