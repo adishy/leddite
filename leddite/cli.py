@@ -15,31 +15,31 @@ import leddite
 
 def api(**kwargs):
     endpoints = {
-       "set_context": {
-          "url": "/home/set_context/<context-name>/",
+       "context_set": {
+          "url": "/context/set/<context-name>/",
           "params": {
             "<context-name>": ""
           },
           "method": "POST"
        },
-       "context_threads": {
-          "url": "/home/context_threads/",
+       "context_info_all": {
+          "url": "/context/info/all/",
           "method": "GET"
        },
-       "active_context": {
-          "url": "/home/active_context/",
+       "context_info_active": {
+          "url": "/context/info/active/",
           "method": "GET"
        },
-       "start_carousel": {
-          "url": "/home/start_carousel/",
+       "carousel_start": {
+          "url": "/carousel/start/",
           "method": "POST"
        }, 
-       "stop_carousel": {
-          "url": "/home/stop_carousel/",
+       "carousel_stop": {
+          "url": "/carousel/stop/",
           "method": "POST"
        },
-       "carousel_threads": {
-          "url": "/home/carousel_threads/",
+       "carousel_info": {
+          "url": "/carousel/info/",
           "method": "GET"
        }
     }
@@ -115,20 +115,20 @@ def run_cli():
 
     if arguments['context']:
         if arguments['info'] and arguments['all']:
-            exit(api(endpoint="context_threads", hostname=hostname, debug=debug))
+            exit(api(endpoint="context_info_all", hostname=hostname, debug=debug))
         elif arguments['info'] and arguments['active']:
-            exit(api(endpoint="active_context", hostname=hostname, debug=debug))
+            exit(api(endpoint="context_info_active", hostname=hostname, debug=debug))
         elif arguments['set']:
             context_name = arguments['<context-name>']
-            exit(api(endpoint="set_context", context_name=context_name, hostname=hostname, debug=debug))
+            exit(api(endpoint="context_set", context_name=context_name, hostname=hostname, debug=debug))
     
     if arguments['carousel']: 
         if arguments['start']:
-            exit(api(endpoint="start_carousel", hostname=hostname, debug=debug))
+            exit(api(endpoint="carousel_start", hostname=hostname, debug=debug))
         elif arguments['stop']:
-            exit(api(endpoint="stop_carousel", hostname=hostname, debug=debug))
+            exit(api(endpoint="carousel_stop", hostname=hostname, debug=debug))
         else:
-            exit(api(endpoint="carousel_threads", hostname=hostname, debug=debug))
+            exit(api(endpoint="carousel_info", hostname=hostname, debug=debug))
 
 
 if __name__ == "__main__":
