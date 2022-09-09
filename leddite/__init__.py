@@ -32,6 +32,7 @@ def initialize_context_registry(screen):
                           { "context": leddite.hw.contexts.Blank(screen), "handler": blank_context_handler },
                           { "context": leddite.hw.contexts.Calendar(screen), "handler": None },
                           { "context": leddite.hw.contexts.Heartbeat(screen), "handler": None },
+                          { "context": leddite.hw.contexts.IP(screen), "handler": None },
                           { "context": leddite.hw.contexts.Welcome(screen), "handler": None },
                          ]
     
