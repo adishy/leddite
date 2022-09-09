@@ -1,18 +1,13 @@
 <!DOCTYPE HTML>
-<html>
-   <head>
-     <title>LED Grid</title>
-   </head>
-   <body>
-	<p>Hello! Upload a 16x16 image:</p>
-	
-	<form action="/upload" method="POST" enctype="multipart/form-data">
-		<input type="file" name="file">
-		<input type="submit" value="Upload!"> 
-	</form>
 
-	<form action="/erase_screen" method="POST" enctype="multipart/form-data">
-		<input type="submit" value="Erase!"> 
-	</form>
-   </body>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+       <title>Leddite</title>
+       <link rel="stylesheet" href="/static/css/pico.css"> 
+       <link rel="stylesheet" href="/static/css/style.css"> 
+    </head>
+    <script type="module" src="/static/js/switch.js"></script>
+    <script type="module" src="/static/js/index.js"></script>
 </html>

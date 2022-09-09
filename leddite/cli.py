@@ -4,6 +4,7 @@ Usage:
     leddite context set <context-name> [<context-args>] [--hostname=<hostname>] [--debug]
     leddite context info (all|active) [--hostname=<hostname>] [--debug]
     leddite carousel (start|stop|info) [--hostname=<hostname>] [--debug]
+    leddite test web [--port=<port>]
 """
 from docopt import docopt
 import requests
@@ -94,6 +95,14 @@ def api(**kwargs):
 
 def run_cli():
     arguments = docopt(__doc__)
+
+    if arguments['test']:
+        if arguments['web']:
+            port = 5000
+            if arguments['--port']:
+                port = int(arguments['--port'])
+            leddite.test_web(port)
+
     if arguments['serve']:
         port = 5000
         virtual_screen = True
@@ -113,6 +122,7 @@ def run_cli():
     if arguments['--debug']:
         debug = True 
 
+            
     if arguments['context']:
         if arguments['info'] and arguments['all']:
             exit(api(endpoint="context_info_all", hostname=hostname, debug=debug))

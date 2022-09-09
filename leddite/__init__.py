@@ -50,4 +50,6 @@ def run(port, virtual=True, h=16, w=16):
         leddite.screen = leddite.hw.screens.PhysicalScreen()
     initialize_context_registry(leddite.screen)
     app.run(debug=True, host='0.0.0.0', port=port, use_reloader=False)
-   
+
+def test_web(port):
+    app.run(debug=True, host='0.0.0.0', port=port, use_reloader=True)
