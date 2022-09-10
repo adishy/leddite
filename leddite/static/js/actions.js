@@ -11,7 +11,7 @@ class Power extends Component {
                             'Content-Type': "application/json"
                         },
                         sleep: {
-                            url: "context/set/blank/",
+                            url: () => ( this.state.checked.sleep ) ? "context/set/blank" : "carousel/start/",
                             method: "POST",
                         }
                     },
@@ -25,7 +25,10 @@ class Power extends Component {
 
   endpointHandler = async (endpoint) => {
     let action = this.state.endpoints[endpoint];
-    let url = `${this.state.endpoints.base}${action.url}`;
+    let endpointUrl = action.url;
+    // Sometimes, endpoints for the same action may be change with other state
+    if ( typeof endpointUrl == 'function') endpointUrl = action.url();
+    let url = `${this.state.endpoints.base}${endpointUrl}`;
     let params = {
        method: action.method,
        headers: this.state.endpoints.headers,
@@ -57,7 +60,7 @@ class Power extends Component {
                       <input type="checkbox" id="sleep" name="sleep" role="switch" checked=${checked.sleep} onClick=${this.checkedHandler}/>
                       <b>Sleep</b>
                     </label>
-                    <small class="muted">This turns off the screen. Leddite will still be connected to the network, running in the background.</small>
+                    <small class="muted">This turns off the screen. Leddite will still be connected to the network, running in the background. When Leddite turns back on, it will be in carousel mode.</small>
                 </article>`;
   }
 }
