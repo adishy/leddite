@@ -40,16 +40,6 @@ class Power extends Component {
      for ( let category in categories ) {
         if ( ! ( 'init' in categories[category] ) ) continue;
         this.updateByAction("init", category);
-
-        //const resp = await this.endpointHandler("init", category);
-        //const respData = await resp.json();
-
-        //// State to change once the status is retrieved
-        //let stateKey = categories[category].init.stateKey;
-        //// Key to use within the response, when setting current state
-        //let respKey = categories[category].init.respKey;
-
-        //await this.updateCategoryState(category, stateKey, respData[respKey]);
      }
   }
 
@@ -75,30 +65,22 @@ class Power extends Component {
     return fetch(url, params);
   };
 
-  updateCategoryState = async (category, key, changed) => {
-    return this.setState({ [key]: { ...this.state[key], [category]: changed } });
-  };
-
   updateByAction = async (action, category) => {
       const categories = this.state.endpoints.categories;
-      const resp = await this.endpointHandler(action, category);
-      const respData = await resp.json();
+
+      const resp = await this.endpointHandler(action, category).json();
 
       // State to change once the status is retrieved
       let stateKey = categories[category][action].stateKey;
+
       // Key to use within the response, when setting current state
       let respKey = categories[category][action].respKey;
 
-      return this.setState({ [stateKey]: { ...this.state[stateKey], [category]: respData[respKey] } });
+      return this.setState({ [stateKey]: { ...this.state[stateKey], [category]: resp[respKey] } });
   }
   
   checkedHandler = async event => {
       this.updateByAction("changed", event.target.name);
-      //let category = event.target.name;
-      //const resp = await this.endpointHandler("changed", category);
-      //const respData = await resp.json();
-      //const respKey = this.endpoints.
-      //await this.updateCategoryState(category, "checked", _stopped);
   };
 
   render(_, { checked }) { 
