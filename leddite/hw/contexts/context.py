@@ -11,6 +11,7 @@ class Context:
         self.screen = screen
 
     context_registry = {}
+    carousel_context_registry = {}
     context_handlers = {}
     carousel_context = None
     carousel_thread = None
@@ -21,6 +22,7 @@ class Context:
 
     @classmethod
     def start_carousel(cls, blank_context, carousel_context_names = [ "clock", "calendar" ]):
+        cls.set_context(blank_context)
         if cls.carousel_thread is not None:
             print("Carousel has already started", file=sys.stderr)
             return False

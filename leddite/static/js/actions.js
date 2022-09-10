@@ -1,7 +1,8 @@
 import { Component } from 'https://unpkg.com/preact?module';
 import { html, render } from 'https://unpkg.com/htm/preact/standalone.module.js'
+import { Sleep } from './sleep.js'
 
-class Power extends Component {
+class Options extends Component {
   constructor() {
     super();
     this.state = {
@@ -24,6 +25,21 @@ class Power extends Component {
                                     respKey: "carousel_stopped",
                                     method: "GET"
                                 }
+                            },
+
+                            contextCarousel: {
+                                changed: {
+                                    url: () => ( !this.state.checked.sleep ) ? "carousel/stop/" : "carousel/start/", 
+                                    method: "POST",
+                                    stateKey: "checked",
+                                    respKey: "carousel_stopped",
+                                },
+                                init: {
+                                    url: "carousel/info/",
+                                    stateKey: "checked",
+                                    respKey: "carousel_stopped",
+                                    method: "GET"
+                                }
                             }
                         }
                     },
@@ -31,6 +47,10 @@ class Power extends Component {
                     // Track checkbox state for actions
                     checked: {
                         sleep: false,
+                    }
+            
+                    data: {
+                        contextCarousel: {}
                     }
                  };
   }
@@ -43,7 +63,7 @@ class Power extends Component {
      }
   }
 
-  endpointHandler = async (action, category) => {
+  endpointHandler = async (action, category, data=null) => {
     let endpoint = this.state.endpoints.categories[category][action];
     let endpointUrl = endpoint.url;
     // Sometimes, endpoints for the same action and category may depend on some other state
@@ -53,7 +73,7 @@ class Power extends Component {
        method: endpoint.method,
        headers: this.state.endpoints.headers,
     }
-    if ( params.method == "POST" ) params.body = ( 'body' in endpoint ) ? endpoint.body : {}
+    if ( params.method == "POST" && data ) params.body = data;
     console.log({ 
                   checked: this.state.checked,
                   src: "endpointHandler", 
@@ -86,17 +106,15 @@ class Power extends Component {
 
   render(_, { checked }) { 
     return html`<article>
-                    <ul class="section-title-wrapper">
-                        <li><i class="gg-plug"></i></li>
-                        <li><h5>Power</h5></li>
-                    </ul>
-                    <label for="switch">
-                      <input type="checkbox" id="sleep" name="sleep" role="switch" checked=${checked.sleep} onClick=${this.checkedHandler}/>
-                      <b>Sleep</b>
-                    </label>
-                    <small class="muted">This turns off the screen. Leddite will still be connected to the network, running in the background. When Leddite turns back on, it will be in carousel mode.</small>
+                    <${Sleep} checked="${checked.sleep}" checkedHandler=${this.checkedHandler}/>
+                    <main class="container">
+                        <ul class="section-title-wrapper">
+                            <li><i class="gg-collage"></i></li>
+                            <li><h5>Context Carousel</h5></li>
+                        </ul>
+                    </main>
                 </article>`;
   }
 }
 
-export { Power };
+export { Options };
