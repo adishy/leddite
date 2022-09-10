@@ -12,11 +12,13 @@ def carousel_start():
         contexts = [ "clock", "calendar", "weather", "heartbeat" ]
     if leddite.hw.contexts.Context.start_carousel(blank_context, contexts):
         return flask.jsonify({
+                               "carousel_running": True,
                                "status": 200,
                                "msg": f"Carousel will be started with the following contexts: {contexts}"
                              })
     else:   
         return flask.jsonify({
+                               "carousel_running": True,
                                "status": 403,
                                "msg": f"Carousel has already been started"
                              })
@@ -26,11 +28,13 @@ def carousel_stop():
     blank_context = leddite.hw.contexts.Blank(leddite.screen)
     if leddite.hw.contexts.Context.stop_carousel(blank_context):
         return flask.jsonify({
+                               "carousel_running": False,
                                "status": 200,
                                "msg": f"Carousel will be stopped"
                              })
     else:
         return flask.jsonify({
+                               "carousel_running": False,
                                "status": 403,
                                "msg": f"Carousel is not running"
                              })

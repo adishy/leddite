@@ -11,7 +11,7 @@ class Power extends Component {
                             'Content-Type': "application/json"
                         },
                         sleep: {
-                            url: () => ( this.state.checked.sleep ) ? "context/set/blank" : "carousel/start/",
+                            url: () => ( this.state.checked.sleep ) ? "carousel/stop" : "carousel/start/",
                             method: "POST",
                         }
                     },
@@ -43,11 +43,14 @@ class Power extends Component {
       let checked = { ...this.state.checked };
       checked[type] = !checked[type]
       this.setState({ checked });
-      await this.endpointHandler(type)
-            .catch(error => {
-                checked[type] = !checked[type];
-                this.setState({ checked });
-            });
+      const resp = await this.endpointHandler(type)
+                             .catch(error => {
+                                 checked[type] = !checked[type];
+                                 this.setState({ checked });
+                             });
+      const currentCarouselStatus = await resp.json().carousel_running;
+      checked[type] = currentCarouselStatus;
+      this.setState({ checked });
   };
 
   render(_, { checked }) { 
