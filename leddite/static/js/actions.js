@@ -1,5 +1,5 @@
-import { Component, render } from './preact.js';
-import { html } from './preact-standalone-htm.js';
+import { Component } from 'https://unpkg.com/preact?module';
+import { html, render } from 'https://unpkg.com/htm/preact/standalone.module.js'
 
 class Power extends Component {
   constructor() {
@@ -15,12 +15,13 @@ class Power extends Component {
                                 changed: {
                                     url: () => ( !this.state.checked.sleep ) ? "carousel/stop/" : "carousel/start/", 
                                     method: "POST",
-                                
+                                    stateKey: "checked",
+                                    respKey: "carousel_stopped",
                                 },
                                 init: {
                                     url: "carousel/info/",
                                     stateKey: "checked",
-                                    respKey: "carousel_running",
+                                    respKey: "carousel_stopped",
                                     method: "GET"
                                 }
                             }
@@ -29,7 +30,7 @@ class Power extends Component {
 
                     // Track checkbox state for actions
                     checked: {
-                        sleep: true,
+                        sleep: false,
                     }
                  };
   }
@@ -38,16 +39,17 @@ class Power extends Component {
      let categories = this.state.endpoints.categories;
      for ( let category in categories ) {
         if ( ! ( 'init' in categories[category] ) ) continue;
+        this.updateByAction("init", category);
 
-        const resp = await this.endpointHandler("init", category);
-        const respData = await resp.json();
+        //const resp = await this.endpointHandler("init", category);
+        //const respData = await resp.json();
 
-        // State to change once the status is retrieved
-        let stateKey = categories[category].init.stateKey;
-        // Key to use within the response, when setting current state
-        let respKey = categories[category].init.respKey;
+        //// State to change once the status is retrieved
+        //let stateKey = categories[category].init.stateKey;
+        //// Key to use within the response, when setting current state
+        //let respKey = categories[category].init.respKey;
 
-        await this.updateCategoryState(category, stateKey, respData[respKey]);
+        //await this.updateCategoryState(category, stateKey, respData[respKey]);
      }
   }
 
@@ -77,11 +79,26 @@ class Power extends Component {
     return this.setState({ [key]: { ...this.state[key], [category]: changed } });
   };
 
+  updateByAction = async (action, category) => {
+      const categories = this.state.endpoints.categories;
+      const resp = await this.endpointHandler(action, category);
+      const respData = await resp.json();
+
+      // State to change once the status is retrieved
+      let stateKey = categories[category][action].stateKey;
+      // Key to use within the response, when setting current state
+      let respKey = categories[category][action].respKey;
+
+      return this.setState({ [stateKey]: { ...this.state[stateKey], [category]: respData[respKey] } });
+  }
+  
   checkedHandler = async event => {
-      let category = event.target.name;
-      const resp = await this.endpointHandler("changed", category);
-      const currentCarouselStatus = await resp.json().carousel_running;
-      await this.updateCategoryState(category, "checked", currentCarouselStatus);
+      this.updateByAction("changed", event.target.name);
+      //let category = event.target.name;
+      //const resp = await this.endpointHandler("changed", category);
+      //const respData = await resp.json();
+      //const respKey = this.endpoints.
+      //await this.updateCategoryState(category, "checked", _stopped);
   };
 
   render(_, { checked }) { 

@@ -12,13 +12,13 @@ def carousel_start():
         contexts = [ "clock", "calendar", "weather", "heartbeat" ]
     if leddite.hw.contexts.Context.start_carousel(blank_context, contexts):
         return flask.jsonify({
-                               "carousel_running": True,
+                               "carousel_stopped": False,
                                "status": 200,
                                "msg": f"Carousel will be started with the following contexts: {contexts}"
                              })
     else:   
         return flask.jsonify({
-                               "carousel_running": True,
+                               "carousel_stopped": False,
                                "status": 403,
                                "msg": f"Carousel has already been started"
                              })
@@ -26,20 +26,20 @@ def carousel_start():
 @leddite.app.route("/api/v1/carousel/stop/", methods=[ "POST" ])
 def carousel_stop():
     return flask.jsonify({
-                           "carousel_running": False,
+                           "carousel_stopped": True,
                            "status": 200,
                            "msg": f"Carousel will be stopped"
                          })
     blank_context = leddite.hw.contexts.Blank(leddite.screen)
     if leddite.hw.contexts.Context.stop_carousel(blank_context):
         return flask.jsonify({
-                               "carousel_running": False,
+                               "carousel_stopped": True,
                                "status": 200,
                                "msg": f"Carousel will be stopped"
                              })
     else:
         return flask.jsonify({
-                               "carousel_running": False,
+                               "carousel_stopped": True,
                                "status": 403,
                                "msg": f"Carousel is not running"
                              })
@@ -55,7 +55,7 @@ def context_carousel():
         carousel_context = leddite.hw.contexts.Context.carousel_context.name()
     return flask.jsonify({
                            "carousel_thread_name": carousel_thread_name,
-                           "carousel_running": carousel_thread_uid is not None,
+                           "carousel_stopped": carousel_thread_uid is None,
                            "carousel_context": carousel_context,
                            "status": 200,
                          })
