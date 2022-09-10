@@ -1,3 +1,13 @@
+.section-title-wrapper {
+    padding: 0;
+    margin: 0;
+}
+
+.section-title-wrapper li{
+    display: inline-flex;
+    padding: 5px;
+}
+
 .muted {
     color: #7f8585;
 }
