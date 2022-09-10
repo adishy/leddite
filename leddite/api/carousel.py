@@ -25,6 +25,11 @@ def carousel_start():
 
 @leddite.app.route("/api/v1/carousel/stop/", methods=[ "POST" ])
 def carousel_stop():
+    return flask.jsonify({
+                           "carousel_running": False,
+                           "status": 200,
+                           "msg": f"Carousel will be stopped"
+                         })
     blank_context = leddite.hw.contexts.Blank(leddite.screen)
     if leddite.hw.contexts.Context.stop_carousel(blank_context):
         return flask.jsonify({
@@ -43,13 +48,14 @@ def carousel_stop():
 def context_carousel():
     carousel_thread_uid = leddite.hw.contexts.Context.carousel_thread
     if carousel_thread_uid is None:
-        carousel_thread_uid = "No carousel thread"
-        carousel_context = "No carousel context"
+        carousel_thread_name= None
+        carousel_context = None
     else:
-        carousel_thread_uid = carousel_thread_uid.name
+        carousel_thread_name = carousel_thread_uid.name
         carousel_context = leddite.hw.contexts.Context.carousel_context.name()
     return flask.jsonify({
-                           "carousel_thread_name": carousel_thread_uid,
+                           "carousel_thread_name": carousel_thread_name,
+                           "carousel_running": carousel_thread_uid is not None,
                            "carousel_context": carousel_context,
                            "status": 200,
                          })

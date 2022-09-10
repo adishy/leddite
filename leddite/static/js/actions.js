@@ -10,47 +10,78 @@ class Power extends Component {
                         headers: {
                             'Content-Type': "application/json"
                         },
-                        sleep: {
-                            url: () => ( this.state.checked.sleep ) ? "carousel/stop" : "carousel/start/",
-                            method: "POST",
+                        categories: {
+                            sleep: {
+                                changed: {
+                                    url: () => ( !this.state.checked.sleep ) ? "carousel/stop/" : "carousel/start/", 
+                                    method: "POST",
+                                
+                                },
+                                init: {
+                                    url: "carousel/info/",
+                                    stateKey: "checked",
+                                    respKey: "carousel_running",
+                                    method: "GET"
+                                }
+                            }
                         }
                     },
 
                     // Track checkbox state for actions
                     checked: {
-                        sleep: false, 
+                        sleep: true,
                     }
                  };
   }
 
-  endpointHandler = async (endpoint) => {
-    let action = this.state.endpoints[endpoint];
-    let endpointUrl = action.url;
-    // Sometimes, endpoints for the same action may be change with other state
-    if ( typeof endpointUrl == 'function') endpointUrl = action.url();
+  async componentDidMount() {
+     let categories = this.state.endpoints.categories;
+     for ( let category in categories ) {
+        if ( ! ( 'init' in categories[category] ) ) continue;
+
+        const resp = await this.endpointHandler("init", category);
+        const respData = await resp.json();
+
+        // State to change once the status is retrieved
+        let stateKey = categories[category].init.stateKey;
+        // Key to use within the response, when setting current state
+        let respKey = categories[category].init.respKey;
+
+        await this.updateCategoryState(category, stateKey, respData[respKey]);
+     }
+  }
+
+  endpointHandler = async (action, category) => {
+    let endpoint = this.state.endpoints.categories[category][action];
+    let endpointUrl = endpoint.url;
+    // Sometimes, endpoints for the same action and category may depend on some other state
+    if ( typeof endpointUrl == 'function') endpointUrl = endpointUrl();
     let url = `${this.state.endpoints.base}${endpointUrl}`;
     let params = {
-       method: action.method,
+       method: endpoint.method,
        headers: this.state.endpoints.headers,
-       body: ( 'body' in action ) ? action.body : {}
     }
+    if ( params.method == "POST" ) params.body = ( 'body' in endpoint ) ? endpoint.body : {}
+    console.log({ 
+                  checked: this.state.checked,
+                  src: "endpointHandler", 
+                  action: action,
+                  category: category,
+                  params: params,
+                  url: url,
+                });
     return fetch(url, params);
   };
 
+  updateCategoryState = async (category, key, changed) => {
+    return this.setState({ [key]: { ...this.state[key], [category]: changed } });
+  };
+
   checkedHandler = async event => {
-      console.log(event.target.name, this.state);
-      let type = event.target.name;
-      let checked = { ...this.state.checked };
-      checked[type] = !checked[type]
-      this.setState({ checked });
-      const resp = await this.endpointHandler(type)
-                             .catch(error => {
-                                 checked[type] = !checked[type];
-                                 this.setState({ checked });
-                             });
+      let category = event.target.name;
+      const resp = await this.endpointHandler("changed", category);
       const currentCarouselStatus = await resp.json().carousel_running;
-      checked[type] = currentCarouselStatus;
-      this.setState({ checked });
+      await this.updateCategoryState(category, "checked", currentCarouselStatus);
   };
 
   render(_, { checked }) { 

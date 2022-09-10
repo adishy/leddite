@@ -1,5 +1,7 @@
-import { h, Component, render } from 'https://unpkg.com/preact?module';
-import { html } from 'https://unpkg.com/htm/preact/standalone.module.js'
+import { debug } from './preact-debug.js'
+import { devtools } from './preact-devtools.js'
+import { Component, render } from './preact.js';
+import { html } from './preact-standalone-htm.js';
 import { Power } from './actions.js';
 
 function App (props) {
