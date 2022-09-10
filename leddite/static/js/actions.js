@@ -68,7 +68,8 @@ class Power extends Component {
   updateByAction = async (action, category) => {
       const categories = this.state.endpoints.categories;
 
-      const resp = await this.endpointHandler(action, category).json();
+      const resp = await this.endpointHandler(action, category);
+      const respData = await resp.json();
 
       // State to change once the status is retrieved
       let stateKey = categories[category][action].stateKey;
@@ -76,7 +77,7 @@ class Power extends Component {
       // Key to use within the response, when setting current state
       let respKey = categories[category][action].respKey;
 
-      return this.setState({ [stateKey]: { ...this.state[stateKey], [category]: resp[respKey] } });
+      return this.setState({ [stateKey]: { ...this.state[stateKey], [category]: respData[respKey] } });
   }
   
   checkedHandler = async event => {

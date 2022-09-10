@@ -25,11 +25,6 @@ def carousel_start():
 
 @leddite.app.route("/api/v1/carousel/stop/", methods=[ "POST" ])
 def carousel_stop():
-    return flask.jsonify({
-                           "carousel_stopped": True,
-                           "status": 200,
-                           "msg": f"Carousel will be stopped"
-                         })
     blank_context = leddite.hw.contexts.Blank(leddite.screen)
     if leddite.hw.contexts.Context.stop_carousel(blank_context):
         return flask.jsonify({
