@@ -39,10 +39,13 @@ class Clock(Context):
         print("current context is changed: clock")
 
     def name(self):
-        return "clock"
+        return "Clock"
  
     def desc(self):
-        return "Displays a clock"
+        return "Displays the current time"
 
     def interval_sec(self):
         return 3
+
+    def meta_context(self):
+        return False

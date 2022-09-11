@@ -27,11 +27,14 @@ class Welcome(Context):
             time.sleep(0.05)
 
     def name(self):
-        return "welcome"
+        return "Welcome"
  
     def desc(self):
         return "Displays a message"
 
     def interval_sec(self):
         return 3
+
+    def meta_context(self):
+        return False
 

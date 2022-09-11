@@ -69,11 +69,14 @@ class Weather(Context):
             time.sleep(0.15)
 
     def name(self):
-        return "weather"
+        return "Weather"
  
     def desc(self):
-        return "Displays Weather using the OpenWeatherMap API"
+        return "Displays the current 'Feels Like' temperature and conditions for a specified location"
 
     def interval_sec(self):
         return 3
+
+    def meta_context(self):
+        return False
 

@@ -61,9 +61,13 @@ class Carousel:
     @classmethod
     def info(cls):
         return {
-                 "carousel_thread_name": cls.carousel_thread.name() if carousel_thread else None,
+                 "carousel_thread_name": cls.carousel_thread.name() if cls.carousel_thread else None,
                  "carousel_stopped": cls.carousel_stopped,
-                 "carousel_context": cls.carousel_context.name(),
-                 "contexts": Context.context_registry,
+                 "carousel_context": cls.carousel_context.name() if cls.carousel_thread else None,
+                 "active_context_ids": cls.active_context_ids,
+                 "contexts": { 
+                     key: { **value.to_dict(), **{ "active": key in cls.active_context_ids } } \
+                     for key, value in Context.context_registry.items()
+                 },
                  "status": 200,
                }

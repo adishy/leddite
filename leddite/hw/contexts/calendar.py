@@ -34,10 +34,13 @@ class Calendar(Context):
             time.sleep(1)
 
     def name(self):
-        return "calendar"
+        return "Calendar"
  
     def desc(self):
-        return "Displays a calendar"
+        return "Displays a calendar showing the current day and date"
     
     def interval_sec(self):
         return 2
+    
+    def meta_context(self):
+        return False

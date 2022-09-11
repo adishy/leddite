@@ -41,6 +41,9 @@ class Context:
     def show(self):
         pass
 
+    def meta_context(self):
+        return True
+
     def thread_uid(self):
         return f"{self.name()}_{self.uid}"
 
@@ -59,12 +62,16 @@ class Context:
     def interval_sec(self):
         return 0 
 
-    def __json__(self):
+    def to_dict(self):
         return {
                   "id": self.id(),
                   "uid": self.uid,
                   "name": self.name(),
                   "description": self.desc(),
                   "thread_uid": self.thread_uid(),
-                  "interval_sec": self.interval_sec()
+                  "interval_sec": self.interval_sec(),
+                  "meta_context": self.meta_context(),
                 }
+        
+    def __json__(self):
+        return self.to_dict()

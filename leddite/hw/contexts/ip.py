@@ -33,10 +33,13 @@ class IP(Context):
             self.small_text_scene.frame()
 
     def name(self):
-        return "IP"
+        return "IP Address"
  
     def desc(self):
-        return "Displays local IP Address"
+        return "Displays Leddite's local IP Address"
     
     def interval_sec(self):
         return 10
+
+    def meta_context(self):
+        return False

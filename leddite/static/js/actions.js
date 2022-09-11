@@ -30,7 +30,7 @@ class Options extends Component {
 
                             contextCarousel: {
                                 init: {
-                                    url: "carousel/contexts/info/",
+                                    url: "carousel/info/",
                                     stateKey: "data",
                                     respKey: "contexts",
                                     method: "GET"
@@ -108,7 +108,7 @@ class Options extends Component {
     console.log("data", data);
     return html`<article>
                     <${Sleep} checked="${checked.sleep}" updateHandler=${this.updateHandler}/>
-                    <${ContextCarousel} carouselData=${data.contextCarousel} updateHandler=${this.updateHandler}/>
+                    <${ContextCarousel} contextCarousel=${data.contextCarousel} updateHandler=${this.updateHandler}/>
                 </article>`;
   }
 }

@@ -66,11 +66,14 @@ class Heartbeat(Context):
             time.sleep(1)
 
     def name(self):
-        return "heartbeat"
+        return "Heartbeat"
  
     def desc(self):
-        return "Displays Heartbeat using the HeartrateHeartbeat API"
+        return "Displays the heartbeat from adishy.com"
 
     def interval_sec(self):
         return 2 
+
+    def meta_context(self):
+        return False
 

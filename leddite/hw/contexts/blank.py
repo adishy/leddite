@@ -12,8 +12,7 @@ class Blank(Context):
        self.screen.refresh()
 
     def name(self):
-        return "blank" 
+        return "Blank" 
 
     def desc(self):
         return f"Blank Context: background color: rgb({self.background_color})" 
-        

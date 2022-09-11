@@ -2,9 +2,10 @@ import { html, render } from 'https://unpkg.com/htm/preact/standalone.module.js'
 
 function Context(props) {
     function bindTrailingArgs(method, ...bound) { return function(...args) { return method(...args, ...bound); } }
+    if ( props.context.meta_context ) return "";
     return html`<li class="carousel-context-wrapper">
                     <label for="switch">
-                      <input type="checkbox" id="${props.contextid}" name="${props.contextid}" role="switch" checked=${!props.context.active} onClick=${props.updateHandler} />
+                      <input type="checkbox" id="${props.contextid}" name="${props.contextid}" role="switch" checked=${props.context.active} onClick=${props.updateHandler} />
                       <b>${props.context.name}</b>
                     </label>
                     <small class="muted">${props.context.description}</small>
@@ -24,9 +25,9 @@ function ContextCarousel(props) {
                     <h6 class="sub-section-title">Contexts</h6>
                     <ul>
                         ${
-                          (props.carouselData) ?
-                            Object.keys(props.carouselData).map(
-                              (key) => html`<${Context} contextid="${key}" context=${props.carouselData[key]} updateHandler=${props.updateHandler}/>`
+                          (props.contextCarousel) ?
+                            Object.keys(props.contextCarousel).map(
+                              (key) => html`<${Context} contextid="${key}" context=${props.contextCarousel[key]} updateHandler=${props.updateHandler}/>`
                             )
                           : "" 
                          }
