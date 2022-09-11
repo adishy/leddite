@@ -1,4 +1,4 @@
-from leddite.hw.contexts import Context
+from leddite.hw.contexts.context import Context
 
 class Blank(Context):
     def __init__(self,screen, color=(0,0,0)):

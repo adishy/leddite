@@ -4,7 +4,6 @@ import { Options } from './actions.js';
 function App (props) {
   return html`<main class="container">
                  <h3>Leddite</h3>
-                 <p>Hello there</p>
                  <${Options}/>
               </main>`
 }

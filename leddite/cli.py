@@ -2,9 +2,8 @@
 Usage:    
     leddite serve [--port=<port>] [--screen_type=(virtual|physical)] [--height=<virtual_screen_height>] [--width=<virtual_screen_width>] [--hostname=<hostname>] [--debug]
     leddite context set <context-name> [<context-args>] [--hostname=<hostname>] [--debug]
-    leddite context info (all|active) [--hostname=<hostname>] [--debug]
+    leddite context info [--hostname=<hostname>] [--debug]
     leddite carousel (start|stop|info) [--hostname=<hostname>] [--debug]
-    leddite test web [--port=<port>]
 """
 from docopt import docopt
 import requests
@@ -23,12 +22,8 @@ def api(**kwargs):
           },
           "method": "POST"
        },
-       "context_info_all": {
+       "context_info": {
           "url": "/context/info/all/",
-          "method": "GET"
-       },
-       "context_info_active": {
-          "url": "/context/info/active/",
           "method": "GET"
        },
        "carousel_start": {
@@ -96,20 +91,11 @@ def api(**kwargs):
 def run_cli():
     arguments = docopt(__doc__)
 
-    if arguments['test']:
-        if arguments['web']:
-            port = 5000
-            if arguments['--port']:
-                port = int(arguments['--port'])
-            leddite.test_web(port)
-
     if arguments['serve']:
         port = 5000
-        virtual_screen = True
+        virtual_screen = arguments["--debug"] or (arguments["--screen_type"] and arguments["--screen_type"] != "virtual")
         virtual_screen_height = 16
         virtual_screen_width = 16
-        if arguments["--screen_type"] and arguments["--screen_type"] != "virtual":
-            virtual_screen = False 
         if arguments['--port']:
             port = int(arguments['--port'])
         leddite.run(port, virtual_screen, virtual_screen_height, virtual_screen_width)
@@ -122,12 +108,9 @@ def run_cli():
     if arguments['--debug']:
         debug = True 
 
-            
     if arguments['context']:
-        if arguments['info'] and arguments['all']:
-            exit(api(endpoint="context_info_all", hostname=hostname, debug=debug))
-        elif arguments['info'] and arguments['active']:
-            exit(api(endpoint="context_info_active", hostname=hostname, debug=debug))
+        if arguments['info']:
+            exit(api(endpoint="context_info", hostname=hostname, debug=debug))
         elif arguments['set']:
             context_name = arguments['<context-name>']
             exit(api(endpoint="context_set", context_name=context_name, hostname=hostname, debug=debug))

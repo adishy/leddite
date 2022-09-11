@@ -1,0 +1,9 @@
+[Unit]
+Description=leddite daemon
+After=multi-user.target
+[Service]
+Type=simple
+Restart=always
+ExecStart=leddite serve --port 80 --screen_type=physical
+[Install]
+WantedBy=multi-user.targe
