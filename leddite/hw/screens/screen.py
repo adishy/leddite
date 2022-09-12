@@ -22,10 +22,10 @@ class Screen:
       return self.active_context
 
    def permission(self):
-      check_permission = threading.current_thread().name == Screen.thread_id
-      if not check_permission:
-        print(f"I tried to write to the screen with no permission: Me: {threading.current_thread().name}. Current: {Screen.thread_uid} Bad Dobby!", file=sys.stderr)
-      return check_permission
+      return threading.current_thread().name == Screen.thread_id
+      #if not check_permission:
+      #  print(f"I tried to write to the screen with no permission: Me: {threading.current_thread().name}. Current: {Screen.thread_uid} Bad Dobby!", file=sys.stderr)
+      #return check_permission
 
    def set_pixel(self, x, y, color, refresh_grid = True):
       pass

@@ -44,8 +44,7 @@ class Scene:
            empty = track.empty()
            if empty:
              continue
-           if track.write_to_screen():
-              print(f"Track {i}: Current Shift: {track.current_horizontal_shift}, Content width: {track.get_contents_width()}")
+           track.write_to_screen():
            if track.get_contents_width() > self.screen.width():
                track.horizontal_shift_one()
        time.sleep(self.inter_frame_pause_sec)
