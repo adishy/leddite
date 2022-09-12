@@ -1,2 +1,3 @@
-pip uninstall leddite
-pip install https://github.com/adishy/leddite.git
+cd $HOME/leddite
+git pull origin master
+pip install -e .

@@ -130,7 +130,9 @@ class Options extends Component {
     return html`<article>
                     <${Sleep} checked="${checked.sleep}" checkedHandler=${this.checkedHandler}/>
                     <${ContextCarousel} contextCarousel=${data.contextCarousel} updateContextHandler=${this.updateContextHandler}/>
-                </article>`;
+                </article>
+                <small class="muted">new features coming soon | <a href="http://adishy.com">© adishy.com</a></small>
+                `;
   }
 }
 
