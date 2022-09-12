@@ -7,14 +7,19 @@
 .section-title-wrapper li{
     display: inline-flex;
     padding: 5px;
+    list-style: none;
 }
 
 ul {
-    list-style-type: none;
 }
 
 .sub-section-title {
     margin-bottom: 0px;
+}
+
+.available-contexts {
+    margin-top: 15px;
+    transition: all 0.5s ease-out;
 }
 
 .muted {
@@ -24,5 +29,12 @@ ul {
 .carousel-context-wrapper {
     padding: 10px;
     padding-top: 28px;
-    border-bottom: 1px solid #383838;
+    border-bottom: 0.3px solid #414949;
 }
+
+.carousel-context-wrapper:last-child {
+    padding: 10px;
+    padding-top: 28px;
+    border-bottom: none;
+}
+

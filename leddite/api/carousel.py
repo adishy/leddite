@@ -5,12 +5,11 @@ import leddite
 @leddite.app.route("/api/v1/carousel/start/", methods=[ "POST" ])
 def carousel_start():
     blank_context = leddite.hw.contexts.Blank(leddite.screen)
-    contexts = leddite.hw.contexts.Carousel.active_context_ids
-    if leddite.hw.contexts.Carousel.start(blank_context, contexts):
+    if leddite.hw.contexts.Carousel.start(blank_context):
         return flask.jsonify({
                                "carousel_stopped": False,
                                "status": 200,
-                               "active_context_ids": contexts,
+                               "active_context_ids": leddite.hw.contexts.Carousel.active_context_ids,
                                "msg": f"Carousel will be started!"
                              })
     else:   
@@ -38,7 +37,8 @@ def carousel_stop():
 
 @leddite.app.route("/api/v1/carousel/contexts/update/", methods=[ "POST" ])
 def carousel_contexts_update():
-    context_ids = flask.get("context_ids")
+    context_ids = flask.request.get_json(force=True)
+    print(context_ids)
     contexts_to_set = []
     print(context_ids)
     for context in context_ids:

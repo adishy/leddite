@@ -34,6 +34,12 @@ class Options extends Component {
                                     stateKey: "data",
                                     respKey: "contexts",
                                     method: "GET"
+                                },
+                            },
+                            contextUpdate: {
+                                update: {
+                                    url: "carousel/contexts/update/",
+                                    method: "POST"
                                 }
                             }
                         }
@@ -100,15 +106,30 @@ class Options extends Component {
       return this.setState({ [stateKey]: { ...this.state[stateKey], [category]: respData[respKey] } });
   }
   
-  updateHandler = async event => {
+  checkedHandler = async event => {
       await this.updateByAction("changed", event.target.name);
   };
 
+  updateContextHandler = async event => {
+      let contextName = event.target.name;
+      let activeContextIds = [];
+      let contextCarouselData = this.state.data.contextCarousel;
+      for ( let key in contextCarouselData ) {
+        if ( contextCarouselData[key].active ) { activeContextIds.push(key); }
+      }
+      let index = activeContextIds.indexOf(contextName);
+      if ( index != -1 ) { activeContextIds.splice(index, 1) }
+      else { activeContextIds.push(contextName) }
+      let data = activeContextIds;
+      const resp = await this.endpointHandler("update", "contextUpdate", JSON.stringify(data));
+      const updateContextCarouselData = await this.updateByAction("init", "contextCarousel");
+      console.log(contextName, activeContextIds, this.state.data.contextCarouselData)
+  }
+
   render(_, { checked, data}) { 
-    console.log("data", data);
     return html`<article>
-                    <${Sleep} checked="${checked.sleep}" updateHandler=${this.updateHandler}/>
-                    <${ContextCarousel} contextCarousel=${data.contextCarousel} updateHandler=${this.updateHandler}/>
+                    <${Sleep} checked="${checked.sleep}" checkedHandler=${this.checkedHandler}/>
+                    <${ContextCarousel} contextCarousel=${data.contextCarousel} updateContextHandler=${this.updateContextHandler}/>
                 </article>`;
   }
 }
