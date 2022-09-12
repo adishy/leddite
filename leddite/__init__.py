@@ -21,8 +21,6 @@ def run(port, virtual=True, h=16, w=16):
     else:
         leddite.screen = leddite.hw.screens.PhysicalScreen()
     leddite.hw.contexts.initialize_registry(leddite.screen)
-    blank_context = leddite.hw.contexts.Blank(leddite.screen)
-    leddite.hw.contexts.Carousel.start(blank_context)
     serve(port)
 
 def serve(port):
