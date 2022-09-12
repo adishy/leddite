@@ -93,7 +93,7 @@ def run_cli():
 
     if arguments['serve']:
         port = 5000
-        virtual_screen = arguments["--debug"] or (arguments["--screen_type"] and arguments["--screen_type"] != "virtual")
+        virtual_screen = arguments["--debug"] or (arguments["--screen_type"] and arguments["--screen_type"] == "virtual")
         virtual_screen_height = 16
         virtual_screen_width = 16
         if arguments['--port']:
