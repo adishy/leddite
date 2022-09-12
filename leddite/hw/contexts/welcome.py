@@ -16,7 +16,7 @@ class Welcome(Context):
         self.scene.set_font_for_track(1, HeartSymbolSmaller)
         self.scene.tracks[1].vertical_shift += 1
         self.scene.add_text_to_track("HAPPY", 0) 
-        self.scene.add_text_to_track("B'DAY !!", 0, (233, 75, 60)) 
+        self.scene.add_text_to_track("BDAY !!", 0, (233, 75, 60)) 
         HeartSymbolSmaller['kerning'] = 3
         self.scene.add_text_to_track("♥♥♥♥♥", 1, (255, 0, 0))
         HeartSymbolSmaller['kerning'] = 0
