@@ -17,8 +17,8 @@ context_request_handlers = {
 
 @leddite.app.route("/api/v1/context/set/<name>/", methods=[ "POST" ])
 def context_set(name):
-    if leddite.hw.contexts.Context.carousel_thread is not None:
-        return flask.jsonify({ "status": 403, "error": "Carousel is active. Please stop carousel before manually setting context" })
+    if leddite.hw.contexts.Carousel.carousel_thread is not None:
+        return flask.jsonify({ "status": 403, "error": "Carousel is active. Please stop carousel before overriding a context" })
     if name in leddite.hw.contexts.Context.context_registry:
         new_context = leddite.hw.contexts.Context.context_registry[name]
         if name in leddite.hw.contexts.Context.context_handlers:
