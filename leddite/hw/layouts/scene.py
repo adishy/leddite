@@ -44,7 +44,7 @@ class Scene:
            empty = track.empty()
            if empty:
              continue
-           track.write_to_screen():
+           track.write_to_screen()
            if track.get_contents_width() > self.screen.width():
                track.horizontal_shift_one()
        time.sleep(self.inter_frame_pause_sec)
