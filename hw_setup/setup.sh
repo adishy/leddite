@@ -1,5 +1,5 @@
-cd $HOME/leddite
+cd /home/pi/leddite/
 git pull origin master
 pip install -e .
-sudo systemctl stop leddite
-sudo systemctl start leddite
+systemctl stop leddite
+systemctl start leddite
