@@ -38,7 +38,7 @@ class IP(Context):
         return "Displays Leddite's local IP Address"
     
     def interval_sec(self):
-        return 45
+        return 30
 
     def meta_context(self):
         return False
