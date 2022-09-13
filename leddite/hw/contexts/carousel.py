@@ -4,7 +4,7 @@ import time
 import sys
 
 class Carousel:
-    active_context_ids = [ "clock" ]
+    active_context_ids = [ "welcome", "ip" ]
     carousel_stopped = True
     carousel_context = None
     carousel_thread = None

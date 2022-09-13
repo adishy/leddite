@@ -26,4 +26,3 @@ def run(port, virtual=True, h=16, w=16):
 def serve(port):
     app.run(debug=True, host='0.0.0.0', port=port, use_reloader=True)
 
-

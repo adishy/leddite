@@ -21,8 +21,8 @@ def context_set(name):
         return flask.jsonify({ "status": 403, "error": "Carousel is active. Please stop carousel before overriding a context" })
     if name in leddite.hw.contexts.Context.context_registry:
         new_context = leddite.hw.contexts.Context.context_registry[name]
-        if name in leddite.hw.contexts.Context.context_handlers:
-            context_handler = leddite.hw.contexts.Context.context_handlers[name]
+        if name in context_request_handlers:
+            context_handler = context_request_handlers[name]
             context_handler(new_context)
     else:
         return flask.jsonify({ "status": 403, "error": "Could not find specified context by the context name" })

@@ -11,15 +11,11 @@ import time
 class Welcome(Context):
     def __init__(self, screen):
         super().__init__(screen)
-        self.scene = TextOnlyScene(screen=self.screen, inter_track_space=1)
+        self.scene = TextOnlyScene(screen=self.screen, inter_track_space=1, font=FontSmall)
         self.scene.generate_tracks()
-        self.scene.set_font_for_track(1, HeartSymbolSmaller)
-        self.scene.tracks[1].vertical_shift += 1
         self.scene.add_text_to_track("HAPPY", 0) 
-        self.scene.add_text_to_track("BDAY !!", 0, (233, 75, 60)) 
-        HeartSymbolSmaller['kerning'] = 3
-        self.scene.add_text_to_track("♥♥♥♥♥", 1, (255, 0, 0))
-        HeartSymbolSmaller['kerning'] = 0
+        self.scene.add_text_to_track("BDAY ", 1, (233, 75, 60)) 
+        self.scene.add_text_to_track("BOO!", 2, (255, 0, 0))
 
     def show(self):
         while self.screen.permission():
@@ -33,7 +29,7 @@ class Welcome(Context):
         return "Displays a message"
 
     def interval_sec(self):
-        return 3
+        return 15
 
     def meta_context(self):
         return False
