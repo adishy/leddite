@@ -23,7 +23,8 @@ class Weather(Context):
         self.api_base_url = "https://api.openweathermap.org/data/2.5/weather"
         self.args = {
             "units": "metric",
-            "zip": env["OPENWEATHERMAP_API_ZIP"],
+            "lat": env["OPENWEATHERMAP_API_LAT"],
+            "long": env["OPENWEATHERMAP_API_LONG"],
             "appid": env["OPENWEATHERMAP_API_SECRET"]
         }
         self.last_update = int(time.time())
