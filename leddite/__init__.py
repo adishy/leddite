@@ -24,13 +24,13 @@ def run(port, virtual=True, h=16, w=16):
     else:
         leddite.screen = leddite.hw.screens.PhysicalScreen()
     leddite.hw.contexts.initialize_registry(leddite.screen)
-    carousel_request_thread = Thread(target=start_carousel, args=(port,))
-    carousel_request_thread.start() 
+    init_carousel_request_thread = Thread(target=init_carousel_start, args=(port,))
+    init_carousel_request_thread.start() 
     serve(port)
 
 def serve(port):
     app.run(debug=True, host='0.0.0.0', port=port, use_reloader=True)
 
-def start_carousel(port):
-    time.sleep(5)
+def init_carousel_start(port):
+    time.sleep(15)
     requests.post(f"http://127.0.0.1:{port}/api/v1/carousel/start/", data={})

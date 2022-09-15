@@ -32,7 +32,7 @@ class IP(Context):
             self.small_text_scene.frame()
 
     def name(self):
-        return "ip"
+        return "IP"
  
     def desc(self):
         return "Displays Leddite's local IP Address"
