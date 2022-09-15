@@ -24,7 +24,7 @@ class Weather(Context):
         self.args = {
             "units": "metric",
             "lat": env["OPENWEATHERMAP_API_LAT"],
-            "long": env["OPENWEATHERMAP_API_LONG"],
+            "lon": env["OPENWEATHERMAP_API_LONG"],
             "appid": env["OPENWEATHERMAP_API_SECRET"]
         }
         self.last_update = int(time.time())
@@ -41,6 +41,7 @@ class Weather(Context):
         }
         api_response = requests.get(self.weather_data_endpoint)
         if api_response.status_code != 200:
+             print(api_response.text, file=sys.stderr)
              return default
         else:
              return api_response.json() 
@@ -80,4 +81,3 @@ class Weather(Context):
 
     def meta_context(self):
         return False
-
