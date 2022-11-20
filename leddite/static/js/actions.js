@@ -1,4 +1,4 @@
-import { Component } from 'https://unpkg.com/preact?module';
+import { Component } from 'https://cdnjs.cloudflare.com/ajax/libs/preact/10.5.8/preact.module.min.js';
 import { html, render } from 'https://unpkg.com/htm/preact/standalone.module.js'
 import { Sleep } from './sleep.js'
 import { ContextCarousel } from './context-carousel.js'
