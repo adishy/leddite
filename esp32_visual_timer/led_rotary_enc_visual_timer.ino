@@ -1,3 +1,5 @@
+// AIDev: Gemini 2.5 Pro Previiew
+
 #include <FastLED.h>
 #include <ESP32Encoder.h>
 
@@ -5,12 +7,10 @@
 #define LED_DATA_PIN   4
 #define LED_TYPE       WS2812B
 #define COLOR_ORDER    GRB
-#define LED_ROWS       16
-#define LED_COLS       16
 #define NUM_LEDS       256 // 16x16
-#define BRIGHTNESS     50
-const int PANEL_WIDTH  = 16; // Number of columns
-const int PANEL_HEIGHT = 16; // Number of rows
+#define BRIGHTNESS     32
+const int PANEL_WIDTH  = 16; // Visual width of the final display
+const int PANEL_HEIGHT = 16; // Visual height of the final display
 CRGB leds[NUM_LEDS];
 uint8_t gHue = 0;
 
@@ -38,7 +38,7 @@ unsigned long timerDuration_ms = 0;
 // --- Button Handling ---
 int lastSwitchState = HIGH;
 unsigned long lastButtonPressTime = 0;
-const unsigned long DEBOUNCE_DELAY = 100;
+const unsigned long DEBOUNCE_DELAY = 100; // ms
 bool buttonActionPending = false;
 
 // --- Font Data (5x7 pixels per digit) ---
@@ -57,75 +57,91 @@ const uint8_t font5x7_data[10][5] = {
 const int FONT_CHAR_WIDTH = 5;
 const int FONT_CHAR_HEIGHT = 7;
 
-// --- XY Mapping Function (Matches Python's set_pixel ordering) ---
-// Takes x_row (row index) and y_col (column index)
-uint16_t XY(uint8_t x_col, uint8_t y_row) {
-  // x_col is the column index (0 to LED_COLUMNS-1)
-  // y_row is the row index (0 to LED_ROWS-1)
-
-  if (x_col >= LED_COLS || y_row >= LED_ROWS) {
-    return NUM_LEDS; // Return an out-of-bounds index for invalid coordinates
+// --- Base Serpentine XY Mapping for an UNROTATED Panel ---
+// (0,0) is top-left of the unrotated panel.
+// 'col' is the column index, 'row' is the row index.
+uint16_t XY_Serpentine_Original(uint8_t col, uint8_t row) {
+  if (col >= PANEL_WIDTH || row >= PANEL_HEIGHT) { // Using PANEL_WIDTH/HEIGHT as physical dimensions here
+    return NUM_LEDS;
   }
-
-  uint16_t index;
-  uint8_t effective_col = x_col;
-
-  // This matches Python's: if (row % 2) > 0 (i.e., row is ODD)
-  if ((y_row % 2) != 0) {
-    // Row is ODD, so flip the column index
-    // Python: y = self.LED_ROWS - 1 - y  (where self.LED_ROWS is panel width, 16)
-    // C++: effective_col = (width_of_panel - 1) - original_column_index
-    effective_col = (LED_COLS - 1) - x_col;
+  uint16_t i;
+  if (row % 2 == 0) { // Even rows: L to R
+    i = (row * PANEL_WIDTH) + col;
+  } else { // Odd rows: R to L
+    i = (row * PANEL_WIDTH) + (PANEL_WIDTH - 1 - col);
   }
-  // Else (row is EVEN), effective_col remains x_col (original column index)
-
-  // Python: position_in_grid = x * self.LED_ROWS + y
-  // C++: index = y_row * panel_width + effective_col
-  index = (y_row * LED_COLS) + effective_col;
-
-  return index;
+  return i;
 }
 
-// --- Function to draw a character ---
-// char_origin_col, char_origin_row: top-left corner of the character on the panel
-void drawChar(char c, int char_origin_col, int char_origin_row, CRGB color) {
+// --- Function to set a pixel on the display with final rotation ---
+// (final_canvas_x, final_canvas_y) is the desired VISUAL position on the *final* output.
+// (0,0) is top-left of this final view.
+void setPixel_Final(int final_canvas_x, int final_canvas_y, CRGB color) {
+  if (final_canvas_x < 0 || final_canvas_x >= PANEL_WIDTH || 
+      final_canvas_y < 0 || final_canvas_y >= PANEL_HEIGHT) {
+    return; // Out of bounds for the final visual canvas
+  }
+
+  // Step 1: Transform final_canvas coordinates to what they would be on the
+  // intermediate 180-degree rotated canvas.
+  // This is a +90 degree clockwise rotation of the canvas.
+  // NewX = MaxY - OldY; NewY = OldX
+  // Here, MaxY is (PANEL_HEIGHT - 1) because PANEL_HEIGHT is the height of the canvas being rotated.
+  int x_on_180_canvas = (PANEL_HEIGHT - 1) - final_canvas_y;
+  int y_on_180_canvas = final_canvas_x;
+
+
+  // Step 2: Now, apply the logic from the previous setPixel_Rotated180,
+  // using x_on_180_canvas and y_on_180_canvas as its input.
+  // This input (x_on_180_canvas, y_on_180_canvas) was treated as the (col, row)
+  // for the XY_Serpentine_Original function in that previous logic.
+  uint16_t serpentine_index_for_original_panel = XY_Serpentine_Original(x_on_180_canvas, y_on_180_canvas);
+
+  // Step 3: Apply the 180-degree flip to that serpentine index.
+  uint16_t physical_led_index = (NUM_LEDS - 1) - serpentine_index_for_original_panel;
+
+  if (physical_led_index < NUM_LEDS) {
+    leds[physical_led_index] = color;
+  }
+}
+
+// --- Function to draw a character using final canvas coordinates ---
+void drawCharOnCanvas(char c, int char_start_final_x, int char_start_final_y, CRGB color) {
   if (c < '0' || c > '9') return;
   uint8_t digitIndex = c - '0';
 
-  for (int char_col_offset = 0; char_col_offset < FONT_CHAR_WIDTH; char_col_offset++) {
-    uint8_t font_column_data = font5x7_data[digitIndex][char_col_offset];
-    for (int char_row_offset = 0; char_row_offset < FONT_CHAR_HEIGHT; char_row_offset++) {
-      if ((font_column_data >> char_row_offset) & 0x01) {
-        int panel_row = char_origin_row + char_row_offset;
-        int panel_col = char_origin_col + char_col_offset;
-        uint16_t ledIndex = XY(panel_row, panel_col); // Call with (row, column)
-        if (ledIndex < NUM_LEDS) {
-          leds[ledIndex] = color;
-        }
+  for (int font_col_offset = 0; font_col_offset < FONT_CHAR_WIDTH; font_col_offset++) {
+    uint8_t columnPixelData = font5x7_data[digitIndex][font_col_offset];
+    for (int font_row_offset = 0; font_row_offset < FONT_CHAR_HEIGHT; font_row_offset++) {
+      if ((columnPixelData >> font_row_offset) & 0x01) {
+        int current_final_x = char_start_final_x + font_col_offset;
+        int current_final_y = char_start_final_y + font_row_offset;
+        setPixel_Final(current_final_x, current_final_y, color);
       }
     }
   }
 }
 
-// --- Function to display a two-digit number ---
+// --- Function to display a two-digit number on the final canvas ---
 void displayNumberOnMatrix(int number, CRGB color) {
   FastLED.clearData();
 
   if (number < 0 || number > 99) return;
 
-  char S1 = (number / 10) + '0'; // Tens digit
-  char S0 = (number % 10) + '0'; // Ones digit
+  char S1 = (number / 10) + '0';
+  char S0 = (number % 10) + '0';
 
   int spacing_between_digits = 2;
   int total_char_block_width = FONT_CHAR_WIDTH + spacing_between_digits + FONT_CHAR_WIDTH;
 
-  // Center the number on the panel
-  int char1_origin_col = (PANEL_WIDTH - total_char_block_width) / 2;
-  int char_origin_row = (PANEL_HEIGHT - FONT_CHAR_HEIGHT) / 2;
-  int char2_origin_col = char1_origin_col + FONT_CHAR_WIDTH + spacing_between_digits;
+  // Center the number on the FINAL visual canvas
+  // Note: PANEL_WIDTH and PANEL_HEIGHT now refer to the dimensions of the final rotated view.
+  int char1_Start_final_x = (PANEL_WIDTH - total_char_block_width) / 2;
+  int char_Start_final_y = (PANEL_HEIGHT - FONT_CHAR_HEIGHT) / 2;
+  int char2_Start_final_x = char1_Start_final_x + FONT_CHAR_WIDTH + spacing_between_digits;
 
-  drawChar(S1, char1_origin_col, char_origin_row, color);
-  drawChar(S0, char2_origin_col, char_origin_row, color);
+  drawCharOnCanvas(S1, char1_Start_final_x, char_Start_final_y, color);
+  drawCharOnCanvas(S0, char2_Start_final_x, char_Start_final_y, color);
 
   FastLED.show();
 }
@@ -216,10 +232,9 @@ void loop() {
         currentState = FINISHED;
         Serial.println("State: FINISHED (Timer Complete)");
         FastLED.clearData();
-        for (int r = 0; r < PANEL_HEIGHT; ++r) {
-          for (int c = 0; c < PANEL_WIDTH; ++c) {
-            uint16_t idx = XY(r, c); // Call with (row, column)
-            if(idx < NUM_LEDS) leds[idx] = CHSV(gHue, 255, 255);
+        for (int fy = 0; fy < PANEL_HEIGHT; ++fy) { // final_canvas_y
+          for (int fx = 0; fx < PANEL_WIDTH; ++fx) { // final_canvas_x
+            setPixel_Final(fx, fy, CHSV(gHue, 255, 255));
           }
         }
         FastLED.show();
@@ -229,11 +244,10 @@ void loop() {
         ledsToLightTarget = constrain(ledsToLightTarget, 0, NUM_LEDS);
         FastLED.clearData();
         int pixels_drawn_count = 0;
-        for (int r = 0; r < PANEL_HEIGHT; ++r) {
-          for (int c = 0; c < PANEL_WIDTH; ++c) {
+        for (int fy = 0; fy < PANEL_HEIGHT; ++fy) { // final_canvas_y
+          for (int fx = 0; fx < PANEL_WIDTH; ++fx) { // final_canvas_x
             if (pixels_drawn_count < ledsToLightTarget) {
-              uint16_t idx = XY(r, c); // Call with (row, column)
-              if(idx < NUM_LEDS) leds[idx] = CHSV(gHue, 255, 255);
+              setPixel_Final(fx, fy, CHSV(gHue, 255, 255));
               pixels_drawn_count++;
             } else {
               goto end_progress_draw_running;
@@ -248,10 +262,9 @@ void loop() {
     }
     case FINISHED:
       FastLED.clearData();
-      for (int r = 0; r < PANEL_HEIGHT; ++r) {
-        for (int c = 0; c < PANEL_WIDTH; ++c) {
-           uint16_t idx = XY(r, c); // Call with (row, column)
-           if(idx < NUM_LEDS) leds[idx] = CHSV(gHue, 255, 255);
+      for (int fy = 0; fy < PANEL_HEIGHT; ++fy) { // final_canvas_y
+        for (int fx = 0; fx < PANEL_WIDTH; ++fx) { // final_canvas_x
+          setPixel_Final(fx, fy, CHSV(gHue, 255, 255));
         }
       }
       FastLED.show();
