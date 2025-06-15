@@ -4,11 +4,11 @@
 #include <ESP32Encoder.h>
 
 // --- LED Panel Configuration ---
-#define LED_DATA_PIN   4
-#define LED_TYPE       WS2812B
-#define COLOR_ORDER    GRB
-#define NUM_LEDS       256 // 16x16
-#define BRIGHTNESS     32
+#define LED_DATA_PIN    4
+#define LED_TYPE        WS2812B
+#define COLOR_ORDER     GRB
+#define NUM_LEDS        256 // 16x16
+#define BRIGHTNESS      28
 const int PANEL_WIDTH  = 16; // Visual width of the final display
 const int PANEL_HEIGHT = 16; // Visual height of the final display
 CRGB leds[NUM_LEDS];
@@ -146,6 +146,28 @@ void displayNumberOnMatrix(int number, CRGB color) {
   FastLED.show();
 }
 
+// --- Function to play the "Finished" animation ---
+void playFinishedAnimation() {
+  const int BLINK_COUNT = 3;
+  const int BLINK_ON_TIME_MS = 300;
+  const int BLINK_OFF_TIME_MS = 300;
+
+  for (int i = 0; i < BLINK_COUNT; i++) {
+    // Fill the screen with the current hue at the default brightness
+    fill_solid(leds, NUM_LEDS, CHSV(gHue, 255, 255));
+    FastLED.show();
+    delay(BLINK_ON_TIME_MS);
+
+    // Turn the screen off
+    FastLED.clear(true);
+    delay(BLINK_OFF_TIME_MS);
+
+    // Increment the hue for the next blink/cycle
+    gHue++;
+  }
+}
+
+
 void setup() {
   Serial.begin(115200);
   delay(2000);
@@ -231,13 +253,7 @@ void loop() {
       if (elapsedTime_ms >= timerDuration_ms) {
         currentState = FINISHED;
         Serial.println("State: FINISHED (Timer Complete)");
-        FastLED.clearData();
-        for (int fy = 0; fy < PANEL_HEIGHT; ++fy) { // final_canvas_y
-          for (int fx = 0; fx < PANEL_WIDTH; ++fx) { // final_canvas_x
-            setPixel_Final(fx, fy, CHSV(gHue, 255, 255));
-          }
-        }
-        FastLED.show();
+        playFinishedAnimation(); // Play the new animation
       } else {
         float progress = (float)elapsedTime_ms / timerDuration_ms;
         int ledsToLightTarget = progress * NUM_LEDS;
