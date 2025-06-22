@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>16x16 LED Matrix Simulator</title>
+    <style>
+        :root {
+            --pixel-size: 25px;
+            --pixel-gap: 3px;
+            --panel-width: calc(16 * (var(--pixel-size) + var(--pixel-gap)));
+            --bg-color: #2c3e50;
+            --case-color: #34495e;
+            --text-color: #ecf0f1;
+            --button-color: #8e44ad;
+            --button-hover: #9b59b6;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .simulator-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 30px;
+        }
+
+        .device-case {
+            background-color: var(--case-color);
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2), inset 0 2px 5px rgba(255,255,255,0.1);
+        }
+
+        #led-matrix {
+            display: grid;
+            grid-template-columns: repeat(16, var(--pixel-size));
+            grid-template-rows: repeat(16, var(--pixel-size));
+            gap: var(--pixel-gap);
+            background-color: #1a2530;
+            border: 5px solid #222;
+            width: var(--panel-width);
+            height: var(--panel-width); /* Make it square */
+            padding: var(--pixel-gap);
+            border-radius: 8px;
+        }
+
+        .pixel {
+            width: var(--pixel-size);
+            height: var(--pixel-size);
+            background-color: #000;
+            border-radius: 4px;
+            transition: background-color 0.05s ease-in-out;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .encoder-turn-controls {
+            display: flex;
+            gap: 15px;
+        }
+
+        .sim-button {
+            background-color: var(--button-color);
+            color: var(--text-color);
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+
+        .sim-button:hover {
+            background-color: var(--button-hover);
+        }
+
+        .info {
+            text-align: center;
+            max-width: 450px;
+        }
+
+        h1 {
+            margin-bottom: 5px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="simulator-container">
+        <div class="info">
+            <h1>LED Matrix Simulator</h1>
+            <p>A web-based testing environment for the ESP32 Visual Timer project. Use the buttons below to simulate the rotary encoder.</p>
+        </div>
+        <div class="device-case">
+            <div id="led-matrix"></div>
+            <div class="controls">
+                <div class="encoder-turn-controls">
+                    <button class="sim-button" id="btn-ccw">Turn CCW (-)</button>
+                    <button class="sim-button" id="btn-cw">Turn CW (+)</button>
+                </div>
+                <button class="sim-button" id="btn-press">Press Button</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Core Simulator Logic ---
+        const PANEL_WIDTH = 16;
+        const PANEL_HEIGHT = 16;
+        const NUM_LEDS = PANEL_WIDTH * PANEL_HEIGHT;
+
+        // --- Simulated Hardware State ---
+        // 'leds' represents the PHYSICAL 1D led array in the C++ code.
+        const leds = Array(NUM_LEDS).fill('#000000');
+        // 'pixels' represents the VISUAL grid of divs on the webpage.
+        const pixels = [];
+        let encoderCount = 0;
+
+        // --- Font Data (Mirrors C++ code) ---
+        const FONT_CHAR_WIDTH  = 5;
+        const FONT_CHAR_HEIGHT = 7;
+        const font5x7_numbers = [
+            [0x3E, 0x51, 0x49, 0x51, 0x3E], [0x00, 0x42, 0x7F, 0x40, 0x00],
+            [0x42, 0x61, 0x51, 0x49, 0x46], [0x22, 0x41, 0x49, 0x49, 0x36],
+            [0x18, 0x14, 0x12, 0x7F, 0x10], [0x2F, 0x49, 0x49, 0x49, 0x31],
+            [0x3E, 0x4A, 0x49, 0x49, 0x30], [0x01, 0x71, 0x09, 0x05, 0x03],
+            [0x36, 0x49, 0x49, 0x49, 0x36], [0x06, 0x49, 0x49, 0x29, 0x1E]
+        ];
+
+        // --- Timer State (Mirrors C++ code) ---
+        const TimerState = { IDLE: 0, SET_TIME: 1, RUNNING: 2, FINISHED: 3 };
+        let currentState = TimerState.IDLE;
+        let selectedMinutes = 1;
+        let timerStartTime_ms = 0;
+        let timerDuration_ms = 0;
+        const ENCODER_STEPS_PER_DETENT = 4; // To match ESP32Encoder logic
+        let lastEncoderDetentPosition = 0;
+
+        // --- Drawing Logic (Direct JS port of the confirmed C++ code) ---
+        function XY_Serpentine_Original(col, row) {
+            if (col >= PANEL_WIDTH || row >= PANEL_HEIGHT) return NUM_LEDS;
+            if (row % 2 === 0) return (row * PANEL_WIDTH) + col;
+            return (row * PANEL_WIDTH) + (PANEL_WIDTH - 1 - col);
+        }
+
+        // This is the API for all drawing functions. It takes a VISUAL coordinate
+        // and calculates the correct PHYSICAL led index to update.
+        function setPixel_Final(x, y, color) {
+            if (x < 0 || x >= PANEL_WIDTH || y < 0 || y >= PANEL_HEIGHT) return;
+            const x_on_180_canvas = (PANEL_HEIGHT - 1) - y;
+            const y_on_180_canvas = x;
+            const serpentine_index = XY_Serpentine_Original(x_on_180_canvas, y_on_180_canvas);
+            const physical_index = (NUM_LEDS - 1) - serpentine_index;
+            if (physical_index < NUM_LEDS) {
+                leds[physical_index] = color;
+            }
+        }
+        
+        function HSVtoRGB(h, s, v) {
+            let r, g, b, i, f, p, q, t;
+            i = Math.floor(h * 6);
+            f = h * 6 - i;
+            p = v * (1 - s);
+            q = v * (1 - f * s);
+            t = v * (1 - (1 - f) * s);
+            switch (i % 6) {
+                case 0: r = v, g = t, b = p; break;
+                case 1: r = q, g = v, b = p; break;
+                case 2: r = p, g = v, b = t; break;
+                case 3: r = p, g = q, b = v; break;
+                case 4: r = t, g = p, b = v; break;
+                case 5: r = v, g = p, b = q; break;
+            }
+            const toHex = c => ('0' + Math.round(c * 255).toString(16)).slice(-2);
+            return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+        }
+
+        // --- Application Logic (Ported from C++) ---
+        function clearLeds() {
+            for (let i = 0; i < NUM_LEDS; i++) leds[i] = '#000000';
+        }
+
+        function drawNumberChar(digit, startX, startY, color) {
+            if (digit > 9) return;
+            for (let col = 0; col < FONT_CHAR_WIDTH; col++) {
+                const colData = font5x7_numbers[digit][col];
+                for (let row = 0; row < FONT_CHAR_HEIGHT; row++) {
+                    if ((colData >> row) & 0x01) {
+                        setPixel_Final(startX + col, startY + row, color);
+                    }
+                }
+            }
+        }
+
+        function displayNumber(number, color) {
+            if (number < 0 || number > 99) return;
+            const spacing = (number >= 10) ? 2 : 0;
+            const totalWidth = (number >= 10) ? (FONT_CHAR_WIDTH * 2 + spacing) : FONT_CHAR_WIDTH;
+            const startX = Math.floor((PANEL_WIDTH - totalWidth) / 2);
+            const startY = Math.floor((PANEL_HEIGHT - FONT_CHAR_HEIGHT) / 2);
+
+            if (number >= 10) {
+                drawNumberChar(Math.floor(number / 10), startX, startY, color);
+                drawNumberChar(number % 10, startX + FONT_CHAR_WIDTH + spacing, startY, color);
+            } else {
+                drawNumberChar(number, startX, startY, color);
+            }
+        }
+
+        // --- Main State Machine (Ported from C++) ---
+        function updateSetTimeState() {
+            const currentDetent = Math.floor(encoderCount / ENCODER_STEPS_PER_DETENT);
+            if (currentDetent !== lastEncoderDetentPosition) {
+                selectedMinutes += (currentDetent - lastEncoderDetentPosition);
+                selectedMinutes = Math.max(1, Math.min(99, selectedMinutes));
+                encoderCount = selectedMinutes * ENCODER_STEPS_PER_DETENT;
+                lastEncoderDetentPosition = selectedMinutes;
+            }
+            displayNumber(selectedMinutes, '#6495ED'); // CornflowerBlue
+        }
+
+        function updateRunningState(gHue) {
+            const elapsedTime_ms = Date.now() - timerStartTime_ms;
+            if (elapsedTime_ms >= timerDuration_ms) {
+                currentState = TimerState.FINISHED;
+                return;
+            }
+
+            const progress = elapsedTime_ms / timerDuration_ms;
+            const ledsToLight = Math.floor(progress * NUM_LEDS);
+            
+            let pixelsDrawn = 0;
+            for (let y = 0; y < PANEL_HEIGHT; y++) {
+                for (let x = 0; x < PANEL_WIDTH; x++) {
+                    if (pixelsDrawn < ledsToLight) {
+                        setPixel_Final(x, y, HSVtoRGB((gHue % 255) / 255, 1, 1));
+                        pixelsDrawn++;
+                    } else {
+                        return; // Exit once progress is drawn
+                    }
+                }
+            }
+        }
+        
+        function updateFinishedState(gHue) {
+            for(let i = 0; i < NUM_LEDS; i++) {
+                // To get the same visual effect as fill_rainbow, we need to map
+                // the visual index back to a physical one for the hue calculation.
+                // This is a bit complex, so we'll just do a simple dynamic rainbow.
+                 leds[i] = HSVtoRGB(((gHue + i*2) % 255) / 255, 1, 1);
+            }
+        }
+
+        function handleButtonPress() {
+            switch (currentState) {
+                case TimerState.IDLE:
+                    currentState = TimerState.SET_TIME;
+                    selectedMinutes = 1;
+                    encoderCount = selectedMinutes * ENCODER_STEPS_PER_DETENT;
+                    lastEncoderDetentPosition = selectedMinutes;
+                    break;
+                case TimerState.SET_TIME:
+                    currentState = TimerState.RUNNING;
+                    timerStartTime_ms = Date.now();
+                    timerDuration_ms = selectedMinutes * 60 * 1000;
+                    break;
+                case TimerState.RUNNING:
+                case TimerState.FINISHED:
+                    currentState = TimerState.IDLE;
+                    break;
+            }
+        }
+
+
+        // --- Simulator Setup & Loop ---
+        function setup() {
+            const matrix = document.getElementById('led-matrix');
+            for (let i = 0; i < NUM_LEDS; i++) {
+                const pixel = document.createElement('div');
+                pixel.classList.add('pixel');
+                matrix.appendChild(pixel);
+                pixels.push(pixel);
+            }
+
+            // Wire up controls
+            document.getElementById('btn-ccw').addEventListener('click', () => { encoderCount -= 4; });
+            document.getElementById('btn-cw').addEventListener('click', () => { encoderCount += 4; });
+            document.getElementById('btn-press').addEventListener('click', handleButtonPress);
+
+            // Start the main loop
+            gameLoop();
+        }
+
+        let gHue = 0;
+        function gameLoop() {
+            // 1. Clear the physical buffer
+            clearLeds();
+            
+            // 2. Run the current state's logic, which populates the physical buffer
+            switch(currentState) {
+                case TimerState.IDLE: /* Do nothing, buffer is black */ break;
+                case TimerState.SET_TIME: updateSetTimeState(); break;
+                case TimerState.RUNNING: updateRunningState(gHue); break;
+                case TimerState.FINISHED: updateFinishedState(gHue); break;
+            }
+
+            // 3. Render the physical buffer to the visual grid
+            for (let y = 0; y < PANEL_HEIGHT; y++) {
+                for (let x = 0; x < PANEL_WIDTH; x++) {
+                    // For each VISUAL pixel (x, y), calculate its PHYSICAL index
+                    const x_on_180_canvas = (PANEL_HEIGHT - 1) - y;
+                    const y_on_180_canvas = x;
+                    const serpentine_index = XY_Serpentine_Original(x_on_180_canvas, y_on_180_canvas);
+                    const physical_index = (NUM_LEDS - 1) - serpentine_index;
+                    
+                    // Get the color from the physical buffer
+                    const color = leds[physical_index] || '#000000';
+
+                    // Find the index of the visual pixel div and update its color
+                    const visual_index = y * PANEL_WIDTH + x;
+                    pixels[visual_index].style.backgroundColor = color;
+                }
+            }
+            
+            gHue = (gHue + 1) % 256;
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Initialize the simulator
+        document.addEventListener('DOMContentLoaded', setup);
+
+    </script>
+</body>
+</html>
