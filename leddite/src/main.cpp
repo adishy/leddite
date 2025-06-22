@@ -1,69 +1,102 @@
 #include <Arduino.h>
 #include <FastLED.h>
-
-// Also include the other planned libraries to ensure they were installed correctly.
-// We don't need to use them in this test, but compiling them validates the setup.
 #include <ESP32Encoder.h>
-#include <Adafruit_GFX.h>
 #include <AceButton.h>
 
-// --- LED Panel Configuration (match this to your hardware) ---
-#define LED_DATA_PIN   4         // The GPIO pin for your LED data line
+using namespace ace_button;
+
+// --- Hardware Pin Definitions ---
+#define LED_DATA_PIN   4     // GPIO pin for LED data
+#define ENCODER_CLK_PIN  32  // Pin A
+#define ENCODER_DT_PIN   33  // Pin B
+#define ENCODER_SW_PIN   25  // Switch pin
+
+// --- LED Panel Configuration ---
 #define LED_TYPE       WS2812B
 #define COLOR_ORDER    GRB
 #define MATRIX_WIDTH   16
 #define MATRIX_HEIGHT  16
 #define NUM_LEDS       (MATRIX_WIDTH * MATRIX_HEIGHT) // 256
-#define BRIGHTNESS     20        // Start with a safe, dim brightness
+#define BRIGHTNESS     40
 
 CRGB leds[NUM_LEDS];
-uint8_t gHue = 0; // Global hue variable for cycling colors
+uint8_t gHue = 0; // Global hue for animations
 
-// --- Test State ---
-int currentLed = 0; // The index of the LED to light up next
-const int FILL_DELAY_MS = 25; // Delay in milliseconds between lighting each LED
+// --- Rotary Encoder & Button Objects ---
+ESP32Encoder encoder;
+AceButton button(ENCODER_SW_PIN);
+
+// Function prototype for the button event handler
+void handleButtonEvent(AceButton* button, uint8_t eventType, uint8_t buttonState);
 
 void setup() {
   Serial.begin(115200);
-  delay(2000); // Delay for power stability and for serial monitor to connect
-  Serial.println("--- ESP32 Hardware Test Program ---");
+  delay(2000); 
+  Serial.println("--- LED & Encoder Proportional Fill Test ---");
+  Serial.println("Turn encoder to fill. Click to reset.");
 
   // --- Initialize FastLED ---
   FastLED.addLeds<LED_TYPE, LED_DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
   FastLED.setBrightness(BRIGHTNESS);
-  
-  // Clear the matrix on boot
-  FastLED.clear();
-  FastLED.show();
-  
+  FastLED.clear(true); // Clear display and show()
   Serial.println("FastLED Initialized.");
-  Serial.println("Starting visual fill test...");
+
+  // --- Initialize Rotary Encoder ---
+  ESP32Encoder::useInternalWeakPullResistors = UP;
+  encoder.attachFullQuad(ENCODER_DT_PIN, ENCODER_CLK_PIN);
+  encoder.clearCount();
+  Serial.println("Rotary Encoder Initialized.");
+  
+  // --- Initialize AceButton ---
+  pinMode(ENCODER_SW_PIN, INPUT_PULLUP);
+  ButtonConfig* buttonConfig = button.getButtonConfig();
+  buttonConfig->setEventHandler(handleButtonEvent);
+  buttonConfig->setFeature(ButtonConfig::kFeatureClick); // We only care about single clicks for this simple test
+  Serial.println("AceButton Initialized. Ready for input.");
+}
+
+// Event handler for button presses
+void handleButtonEvent(AceButton* button, uint8_t eventType, uint8_t buttonState) {
+  if (eventType == AceButton::kEventClicked) {
+    Serial.println(">>> Button Click Detected! Resetting encoder count. <<<");
+    encoder.clearCount();
+  }
 }
 
 void loop() {
-  // Check if we have filled the entire matrix
-  if (currentLed >= NUM_LEDS) {
-    // If full, wait for a moment
-    Serial.println("Matrix full. Resetting test.");
-    delay(1500);
+  // 1. Check for button events (non-blocking)
+  button.check();
 
-    // Then clear the display and start over
-    FastLED.clear();
-    currentLed = 0;
+  // 2. Get current encoder position
+  long encoderPosition = encoder.getCount();
+
+  // 3. Map encoder position to the number of LEDs to light up
+  // The constrain function ensures the value is between 0 and NUM_LEDS (256)
+  int ledsToLight = constrain(encoderPosition, 0, NUM_LEDS);
+
+  // 4. Update the LED display
+  FastLED.clearData(); // Clear the internal buffer
+  for (int i = 0; i < ledsToLight; i++) {
+    // Fill with a color that cycles its hue based on the position
+    leds[i] = CHSV(gHue + (i * 2), 255, 255);
   }
+  FastLED.show(); // Push the data to the LEDs
 
-  // Light up the current LED with the current hue
-  // The mapping from a linear index to a 2D grid is handled automatically
-  // by how the LEDs are wired in the strip.
-  leds[currentLed] = CHSV(gHue, 255, 255); // Hue, Saturation, Value
+  // 5. Provide continuous debug output, throttled to every 250ms
+  static unsigned long lastDebugPrintTime = 0;
+  if (millis() - lastDebugPrintTime > 250) {
+    lastDebugPrintTime = millis();
 
-  // Show the updated LED
-  FastLED.show();
+    // Read the raw physical state of the button pin for debugging
+    int rawButtonState = digitalRead(ENCODER_SW_PIN);
 
-  // Prepare for the next iteration
-  currentLed++; // Move to the next LED
-  gHue += 2;    // Shift the color slightly for the next LED
-
-  // Wait a short moment before lighting the next one
-  delay(FILL_DELAY_MS);
+    Serial.print("Encoder Value: ");
+    Serial.print(encoderPosition);
+    Serial.print("  |  LEDs Lit: ");
+    Serial.print(ledsToLight);
+    Serial.print("  |  Button Pin State: ");
+    Serial.println(rawButtonState == LOW ? "PRESSED" : "RELEASED");
+  }
+  
+  delay(10); // Small delay for system stability
 }
