@@ -4,17 +4,17 @@
 # --- Configuration ---
 CXX = g++
 EMCC = emcc
-CXXFLAGS = -O3 -Iv2/include
+CXXFLAGS = -O3 -Iinclude
 WASM_FLAGS = --bind -s WASM=1 -s ALLOW_MEMORY_GROWTH=1
 
 # Source files
-CORE_SRCS = v2/src/Canvas.cpp v2/src/Transformer.cpp v2/src/MarqueeEngine.cpp v2/src/ProtocolHandler.cpp
-WASM_BRIDGE = v2/simulator/wasm_bridge.cpp
-SIM_DIR = v2/simulator
+CORE_SRCS = src/Canvas.cpp src/Transformer.cpp src/MarqueeEngine.cpp src/ProtocolHandler.cpp
+WASM_BRIDGE = simulator/wasm_bridge.cpp
+SIM_DIR = simulator
 
 # Test files
-TEST_SRCS = v2/test/test_canvas.cpp v2/test/test_transformer.cpp v2/test/test_protocol.cpp
-TEST_BINS = v2/test/test_canvas v2/test/test_transformer v2/test/test_protocol
+TEST_SRCS = test/test_canvas.cpp test/test_transformer.cpp test/test_protocol.cpp
+TEST_BINS = test/test_canvas test/test_transformer test/test_protocol
 
 # --- Targets ---
 
@@ -33,19 +33,19 @@ test: $(TEST_BINS)
 	@echo "Running unit tests..."
 	@for test in $(TEST_BINS); do ./$$test; done
 
-v2/test/test_canvas: v2/test/test_canvas.cpp v2/src/Canvas.cpp v2/src/Transformer.cpp
+test/test_canvas: test/test_canvas.cpp src/Canvas.cpp src/Transformer.cpp
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
-v2/test/test_transformer: v2/test/test_transformer.cpp v2/src/Transformer.cpp
+test/test_transformer: test/test_transformer.cpp src/Transformer.cpp
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
-v2/test/test_protocol: v2/test/test_protocol.cpp v2/src/ProtocolHandler.cpp
+test/test_protocol: test/test_protocol.cpp src/ProtocolHandler.cpp
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 # Convenience target to start the simulator server
 run-sim: simulator
 	@echo "Starting simulator server..."
-	./v2/.venv/bin/python v2/simulator_server.py
+	./.venv/bin/python simulator_server.py
 
 clean:
 	rm -f $(TEST_BINS)

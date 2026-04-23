@@ -1,33 +1,35 @@
 # Leddite V2: High-Performance RGB Matrix API
 
-Leddite V2 is a streamlined, "Sprite-based" binary API for controlling 16x16 RGB LED matrices (WS2812B) on an ESP32. 
+Leddite V2 is a streamlined, "Sprite-based" binary API for controlling 16x16 RGB LED matrices (WS2812B) on an ESP32.
 
 ## Key Features
-- **100% Logic Parity:** The C++ core is compiled to WebAssembly (WASM) for the JS Simulator, ensuring that digital tests perfectly predict hardware behavior.
-- **Binary Protocol:** Optimized 8-byte header + raw RGB payload for low-latency, high-frequency updates (30+ FPS).
-- **Sprite Architecture:** Supports both full-frame 16x16 updates and small, variable-sized icons or text strips.
-- **Automated Marquee:** Internal C++ engine for smooth, sub-pixel-perfect scrolling of large sprites.
-- **TDD-First:** Every core module (`Canvas`, `Transformer`, `ProtocolHandler`, `MarqueeEngine`) is verified with native C++ unit tests.
+- **100% Logic Parity:** The C++ core is compiled to WebAssembly (WASM) for the JS Simulator.
+- **Binary Protocol:** Optimized for 30+ FPS low-latency updates.
+- **LLM Powered:** Generate creative scenes using natural language and the Gemini API.
+- **Automated Marquee:** Internal engine for smooth text scrolling.
 
-## Quick Start
-1.  **Run the Simulator:**
+## Quick Start (Simulator)
+
+1.  **Build and Start:**
     ```bash
     make run-sim
     ```
-    Open `http://localhost:8000` to see the WASM-powered grid in action.
-2.  **Run Unit Tests:**
-    ```bash
-    make test
-    ```
-3.  **Flash ESP32:**
-    Upload `v2/esp32_firmware/esp32_firmware.ino` using the Arduino IDE (requires FastLED and WebSockets libraries).
+2.  **Open Simulator:** Visit `http://localhost:8000` in your browser.
+3.  **Run LLM Scene:**
+    - Create `.env.secrets` in the root and add `LLM_API_KEY=your_key`.
+    - Run:
+      ```bash
+      .venv/bin/python llm_scenes.py "A rainy night in Tokyo"
+      ```
+
+## Development & Hardware
+- **Unit Tests:** `make test`
+- **Firmware:** Upload `esp32_firmware/esp32_firmware.ino` to your ESP32.
+- **Documentation:** Explore the Obsidian vault in `docs/` for deep-dives into each component.
 
 ## Project Structure
-- `v2/src`, `v2/include`: Core C++ logic.
-- `v2/esp32_firmware`: Production firmware for the ESP32.
-- `v2/simulator`: WASM-powered browser simulator.
-- `docs/`: Obsidian vault containing fact sheets for all components.
-- `legacy/`: Archive of the original Python/C++ V1 implementation.
-
-## Binary API Details
-See [v2/API.md](v2/API.md) for the full protocol specification.
+- `src/`, `include/`: Core C++ logic.
+- `esp32_firmware/`: Production ESP32 code.
+- `simulator/`: WASM-powered browser simulator.
+- `hardware_build/`, `hw_setup/`: CAD files, datasheets, and physical setup guides.
+- `docs/`: Obsidian documentation vault.
