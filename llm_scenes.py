@@ -25,6 +25,8 @@ DSL Commands:
     - marquee: true/false. (Text must be longer than 16px to marquee).
 - SLEEP seconds : Pauses execution.
 - SHOW : Forces the display to refresh (useful after many PIXEL commands).
+- LOOP count : Starts a loop that repeats 'count' times.
+- ENDLOOP : Ends a loop block.
 
 Pixel Art Constraints (CRITICAL):
 1. Resolution is ONLY 16x16. Complex icons will look like blobs.

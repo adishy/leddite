@@ -26,17 +26,14 @@ class LedditeDSLRunner:
             # PIXEL x y r g b
             x, y = map(int, parts[1:3])
             color = tuple(map(int, parts[3:6]))
-            # By default PIXEL will show immediately unless we add a flag logic
             await self.client.set_pixel(x, y, color)
 
         elif cmd == "SHOW":
-            # Just send a 1x1 black pixel at (0,0) with show flag but NO clear
-            # This is a bit of a hack to force a show() call on hardware
+            # Force show()
             await self.client.send_sprite(1, 1, x=0, y=0, pixels=[0,0,0], flags=2)
 
         elif cmd == "TEXT":
             # TEXT "msg" x y r g b [rotation] [marquee]
-            # Simple parser for quoted string
             first_quote = line.find('"')
             last_quote = line.rfind('"')
             msg = line[first_quote+1:last_quote]
@@ -44,21 +41,50 @@ class LedditeDSLRunner:
             
             x, y = map(int, remaining[0:2])
             color = tuple(map(int, remaining[2:5]))
-            
-            rotation = 0
-            if len(remaining) > 5:
-                rotation = int(remaining[5])
-            
-            marquee = False
-            if len(remaining) > 6:
-                marquee = remaining[6].lower() == "true"
+            rotation = int(remaining[5]) if len(remaining) > 5 else 0
+            marquee = remaining[6].lower() == "true" if len(remaining) > 6 else False
             
             await self.client.write_text(msg, x, y, color, rotation, marquee)
 
         elif cmd == "SLEEP":
-            # SLEEP seconds
             await asyncio.sleep(float(parts[1]))
 
     async def run_script(self, script: str):
-        for line in script.splitlines():
-            await self.execute_line(line)
+        lines = [line.strip() for line in script.splitlines() if line.strip()]
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            parts = line.split()
+            cmd = parts[0].upper()
+
+            if cmd == "LOOP":
+                count = int(parts[1])
+                # Find the matching ENDLOOP
+                loop_start = i + 1
+                loop_end = -1
+                nesting = 1
+                for j in range(loop_start, len(lines)):
+                    if lines[j].upper().startswith("LOOP"):
+                        nesting += 1
+                    elif lines[j].upper() == "ENDLOOP":
+                        nesting -= 1
+                        if nesting == 0:
+                            loop_end = j
+                            break
+                
+                if loop_end != -1:
+                    loop_body = "\n".join(lines[loop_start:loop_end])
+                    for _ in range(count):
+                        await self.run_script(loop_body)
+                    i = loop_end + 1
+                    continue
+                else:
+                    print(f"Error: Missing ENDLOOP for LOOP at line {i}")
+            
+            elif cmd == "ENDLOOP":
+                # Should have been handled by the LOOP case
+                pass
+            else:
+                await self.execute_line(line)
+            
+            i += 1
