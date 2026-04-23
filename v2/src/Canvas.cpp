@@ -1,3 +1,11 @@
+/**
+ * RENDERING PARITY NOTE:
+ * This file (Canvas.cpp) implements the exact same logic as simulator.js
+ * in the v2/simulator/ directory.
+ * Any changes to the coordinate transformation or buffer drawing logic 
+ * MUST be mirrored in both implementations.
+ */
+
 #include "Canvas.h"
 #include "Transformer.h"
 #include <string.h>

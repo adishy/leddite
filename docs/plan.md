@@ -53,9 +53,10 @@ Refactor `leddite` into a high-performance, "Sprite-based" API for controlling a
 - [ ] Physical serpentine mapping implementation.
 
 ### Phase 5: JS Simulator
-- [ ] 16x16 CSS grid UI.
-- [ ] Parity implementation of the `Canvas` and `Transformer` logic.
-- [ ] WebSocket client to "test" the API format locally.
+- [x] 16x16 CSS grid UI.
+- [x] Parity implementation of the `Canvas` and `Transformer` logic.
+- [x] `simulator_server.py`: Integrated HTTP & WebSocket server for automatic testing.
+- [x] Automatic WebSocket client in `simulator.js`.
 
 ### Phase 6: Validation & Performance
 - [ ] Verify 30+ FPS full-frame updates.
