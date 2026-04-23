@@ -1,6 +1,6 @@
 import os
 import asyncio
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 from leddite_client import LedditeClient
 from dsl_runner import LedditeDSLRunner
@@ -14,7 +14,8 @@ if not api_key:
     print("Error: LLM_API_KEY not found in .env.secrets")
     exit(1)
 
-genai.configure(api_key=api_key)
+# Initialize the new Google GenAI client
+client = genai.Client(api_key=api_key)
 
 SYSTEM_PROMPT = """
 You are a creative artist for a 16x16 RGB LED Matrix called 'Leddite'.
@@ -53,8 +54,11 @@ async def generate_and_run_scene(theme):
     
     for model_name in models_to_try:
         try:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(f"{SYSTEM_PROMPT}\n\nTheme: {theme}")
+            # Use the new SDK generation call
+            response = client.models.generate_content(
+                model=model_name,
+                contents=f"{SYSTEM_PROMPT}\n\nTheme: {theme}"
+            )
             print(f"Used model: {model_name}")
             break
         except Exception as e:
@@ -80,12 +84,12 @@ async def generate_and_run_scene(theme):
     print(dsl_code)
     print("---------------------")
 
-    client = LedditeClient()
-    await client.connect()
-    runner = LedditeDSLRunner(client)
+    leddite_client = LedditeClient()
+    await leddite_client.connect()
+    runner = LedditeDSLRunner(leddite_client)
     
     await runner.run_script(dsl_code)
-    await client.close()
+    await leddite_client.close()
 
 if __name__ == "__main__":
     import sys
