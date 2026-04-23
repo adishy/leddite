@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leddite V2 Simulator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Leddite V2 Simulator</h1>
+        <div id="matrix-container">
+            <div id="led-grid" class="grid-16x16"></div>
+        </div>
+        <div class="controls">
+            <button id="clear-btn">Clear</button>
+            <div class="status">
+                Status: <span id="status-text">Disconnected</span>
+            </div>
+            <div class="info">
+                Last Sprite: <span id="sprite-info">None</span>
+            </div>
+        </div>
+    </div>
+    <script src="simulator.js"></script>
+</body>
+</html>
