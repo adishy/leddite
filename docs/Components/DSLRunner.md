@@ -6,9 +6,11 @@
 - **Language:** Line-based commands.
 - **Commands:**
     - `CLEAR`: Reset screen.
+    - `PIXEL x y r g b`: Set a single pixel (best for fine detail).
     - `RECT x y w h r g b`: Draw rectangle.
     - `TEXT "msg" x y r g b [rot] [marquee]`: Draw text.
     - `SLEEP seconds`: Pause execution.
+    - `SHOW`: Force a display refresh.
 - **Integration:** Maps DSL commands directly to `LedditeClient` methods.
 - **Purpose:** Provides a human-readable and LLM-friendly abstraction layer.
 

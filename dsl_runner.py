@@ -22,6 +22,18 @@ class LedditeDSLRunner:
             color = tuple(map(int, parts[5:8]))
             await self.client.draw_rect(x, y, w, h, color)
 
+        elif cmd == "PIXEL":
+            # PIXEL x y r g b
+            x, y = map(int, parts[1:3])
+            color = tuple(map(int, parts[3:6]))
+            # By default PIXEL will show immediately unless we add a flag logic
+            await self.client.set_pixel(x, y, color)
+
+        elif cmd == "SHOW":
+            # Just send a 1x1 black pixel at (0,0) with show flag but NO clear
+            # This is a bit of a hack to force a show() call on hardware
+            await self.client.send_sprite(1, 1, x=0, y=0, pixels=[0,0,0], flags=2)
+
         elif cmd == "TEXT":
             # TEXT "msg" x y r g b [rotation] [marquee]
             # Simple parser for quoted string

@@ -55,6 +55,9 @@ class LedditeClient:
         pixels = list(color) * (w * h)
         await self.send_sprite(w, h, x, y, pixels=pixels, flags=flags)
 
+    async def set_pixel(self, x, y, color=(255, 255, 255), flags=2):
+        await self.draw_rect(x, y, 1, 1, color, flags=flags)
+
     async def write_text(self, text, x=0, y=0, color=(255, 255, 255), rotation=0, marquee=False):
         text = text.upper()
         w_total = len(text) * 6
