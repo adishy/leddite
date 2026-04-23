@@ -58,7 +58,10 @@ class LedditeDSLRunner:
             cmd = parts[0].upper()
 
             if cmd == "LOOP":
-                count = int(parts[1])
+                count_str = parts[1].upper()
+                is_infinite = count_str in ["0", "INF", "INFINITY"]
+                count = 0 if is_infinite else int(count_str)
+                
                 # Find the matching ENDLOOP
                 loop_start = i + 1
                 loop_end = -1
@@ -74,8 +77,12 @@ class LedditeDSLRunner:
                 
                 if loop_end != -1:
                     loop_body = "\n".join(lines[loop_start:loop_end])
-                    for _ in range(count):
-                        await self.run_script(loop_body)
+                    if is_infinite:
+                        while True:
+                            await self.run_script(loop_body)
+                    else:
+                        for _ in range(count):
+                            await self.run_script(loop_body)
                     i = loop_end + 1
                     continue
                 else:

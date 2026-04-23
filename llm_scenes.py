@@ -25,7 +25,7 @@ DSL Commands:
     - marquee: true/false. (Text must be longer than 16px to marquee).
 - SLEEP seconds : Pauses execution.
 - SHOW : Forces the display to refresh (useful after many PIXEL commands).
-- LOOP count : Starts a loop that repeats 'count' times.
+- LOOP count : Starts a loop that repeats 'count' times. Use 0, INF, or INFINITY for infinite loops.
 - ENDLOOP : Ends a loop block.
 
 Pixel Art Constraints (CRITICAL):

@@ -58,6 +58,17 @@ LOOP 5
   SHOW
   SLEEP 0.5
 ENDLOOP
+""",
+    "infinite_blink": """
+CLEAR
+LOOP INF
+  RECT 0 0 16 16 0 255 0
+  SHOW
+  SLEEP 0.5
+  CLEAR
+  SHOW
+  SLEEP 0.5
+ENDLOOP
 """
 }
 

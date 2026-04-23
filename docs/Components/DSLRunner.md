@@ -11,7 +11,7 @@
     - `TEXT "msg" x y r g b [rot] [marquee]`: Draw text.
     - `SLEEP seconds`: Pause execution.
     - `SHOW`: Force a display refresh.
-    - `LOOP count`: Repeats the following block 'count' times.
+    - `LOOP count`: Repeats the following block 'count' times. Use `0`, `INF`, or `INFINITY` for infinite loops.
     - `ENDLOOP`: Ends a loop block.
 - **Integration:** Maps DSL commands directly to `LedditeClient` methods.
 - **Purpose:** Provides a human-readable and LLM-friendly abstraction layer.
