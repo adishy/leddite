@@ -41,9 +41,28 @@ void test_invalid_size() {
     std::cout << "Test Invalid Size: PASSED" << std::endl;
 }
 
+void test_flag_ack_canvas() {
+    // FLAG_ACK_CANVAS = 0x08; verify it is independent of other flags
+    uint8_t buffer[] = { 1, 0x0F, 4, 4, 0, 0, 0, 64 };  // flags = clear|show|marquee|ack
+    SpriteHeader header;
+    assert(ProtocolHandler::parseHeader(buffer, sizeof(buffer), header));
+    assert(header.clearCanvas()    == true);   // bit 0
+    assert(header.showImmediately()== true);   // bit 1
+    assert(header.marqueeActive()  == true);   // bit 2
+    assert(header.ackCanvas()      == true);   // bit 3
+
+    // Without the ack bit
+    buffer[1] = 0x07;
+    assert(ProtocolHandler::parseHeader(buffer, sizeof(buffer), header));
+    assert(header.ackCanvas() == false);
+
+    std::cout << "Test Flag ACK Canvas: PASSED" << std::endl;
+}
+
 int main() {
     test_header_parse();
     test_invalid_size();
+    test_flag_ack_canvas();
     std::cout << "All Protocol Tests PASSED!" << std::endl;
     return 0;
 }

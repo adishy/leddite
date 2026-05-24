@@ -106,10 +106,39 @@ void NetworkMode::onWebSocketEvent(Canvas& canvas, MarqueeEngine& marquee,
                 // showImmediately: main loop calls updateDisplay() each iteration
                 // so max latency is one loop tick (~1ms at idle, ~33ms under marquee load)
             }
+
+            // FLAG_ACK_CANVAS (0x08): send current canvas buffer back to requester.
+            // Lets test suites verify exact pixel state on real hardware — no camera needed.
+            if (header.ackCanvas()) {
+                sendCanvasAck(canvas, ws, num);
+            }
             break;
         }
 
         default:
             break;
     }
+}
+
+void NetworkMode::sendCanvasAck(const Canvas& canvas, WebSocketsServer& ws, uint8_t num) {
+    // Response: [0xCA, width, height, r,g,b × (width×height)]
+    // 3-byte header + 768-byte payload = 771 bytes total for a 16×16 canvas.
+    static const uint8_t W = Canvas::WIDTH;
+    static const uint8_t H = Canvas::HEIGHT;
+    static const size_t  RESP_LEN = 3 + W * H * 3;
+
+    uint8_t resp[RESP_LEN];
+    resp[0] = CANVAS_ACK_MAGIC;
+    resp[1] = W;
+    resp[2] = H;
+
+    const LedditeCRGB* buf = canvas.getBuffer();
+    for (uint16_t i = 0; i < W * H; i++) {
+        resp[3 + i * 3]     = buf[i].r;
+        resp[3 + i * 3 + 1] = buf[i].g;
+        resp[3 + i * 3 + 2] = buf[i].b;
+    }
+
+    ws.sendBIN(num, resp, RESP_LEN);
+    Serial.printf("[%u] Canvas ACK sent (%u bytes)\n", num, (unsigned)RESP_LEN);
 }

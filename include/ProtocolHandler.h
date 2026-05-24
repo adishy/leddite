@@ -17,6 +17,7 @@ struct SpriteHeader {
     bool clearCanvas() const { return flags & 0x01; }
     bool showImmediately() const { return flags & 0x02; }
     bool marqueeActive() const { return flags & 0x04; }
+    bool ackCanvas() const { return flags & 0x08; }  // request canvas readback
 };
 
 class ProtocolHandler {
