@@ -8,13 +8,13 @@ CXXFLAGS = -O3 -Iinclude
 WASM_FLAGS = --bind -s WASM=1 -s ALLOW_MEMORY_GROWTH=1
 
 # Source files
-CORE_SRCS = src/Canvas.cpp src/Transformer.cpp src/MarqueeEngine.cpp src/ProtocolHandler.cpp
+CORE_SRCS = src/Canvas.cpp src/Transformer.cpp src/MarqueeEngine.cpp src/ProtocolHandler.cpp src/TextRenderer.cpp
 WASM_BRIDGE = simulator/wasm_bridge.cpp
 SIM_DIR = simulator
 
 # Test files
-TEST_SRCS = test/test_canvas.cpp test/test_transformer.cpp test/test_protocol.cpp
-TEST_BINS = test/test_canvas test/test_transformer test/test_protocol
+TEST_SRCS = test/test_canvas.cpp test/test_transformer.cpp test/test_protocol.cpp test/test_text_renderer.cpp
+TEST_BINS = test/test_canvas test/test_transformer test/test_protocol test/test_text_renderer
 
 # --- Targets ---
 
@@ -42,6 +42,9 @@ test/test_transformer: test/test_transformer.cpp src/Transformer.cpp
 test/test_protocol: test/test_protocol.cpp src/ProtocolHandler.cpp
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
+test/test_text_renderer: test/test_text_renderer.cpp src/TextRenderer.cpp
+	$(CXX) $(CXXFLAGS) $^ -o $@
+
 # Convenience target to start the simulator server
 run-sim: simulator
 	@echo "Starting simulator server..."
@@ -51,6 +54,10 @@ clean:
 	rm -f $(TEST_BINS)
 	rm -f $(SIM_DIR)/leddite_wasm.js $(SIM_DIR)/leddite_wasm.wasm
 	@echo "Clean complete."
+
+# Individual test targets for convenience
+test-text-renderer: test/test_text_renderer
+	./test/test_text_renderer
 
 help:
 	@echo "Leddite V2 Build System"
