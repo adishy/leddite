@@ -9,6 +9,7 @@ const char* const MenuMode::LABELS[NUM_OPTIONS] = {
     "NETWORK CANVAS",     // 14 chars × 6 = 84px wide
     "PATTERN SHOW",       // 12 chars × 6 = 72px wide
     "VISUAL TIMER",       // 12 chars × 6 = 72px wide
+    "OCTOPUS DANCE",      // 13 chars × 6 = 78px wide
 };
 
 const AppMode MenuMode::MODES[NUM_OPTIONS] = {
@@ -16,18 +17,20 @@ const AppMode MenuMode::MODES[NUM_OPTIONS] = {
     AppMode::NETWORK,
     AppMode::PATTERN,
     AppMode::TIMER,
+    AppMode::OCTOPUS,
 };
 
-// Distinct accent color per mode — warm palette
+// Distinct accent color per mode — warm palette + ocean teal for octopus
 const uint8_t MenuMode::COLORS[NUM_OPTIONS][3] = {
-    { 255, 200,  80},  // clock+cal:  golden amber
-    { 255, 130,  40},  // network:    warm orange
-    { 255,  90,  90},  // pattern:    warm rose/coral
-    { 255, 230, 100},  // timer:      warm yellow
+    { 255, 200,  80},  // clock+cal:     golden amber
+    { 255, 130,  40},  // network:       warm orange
+    { 255,  90,  90},  // pattern:       warm rose/coral
+    { 255, 230, 100},  // timer:         warm yellow
+    {  40, 220, 210},  // octopus dance: ocean teal
 };
 
-// 4 dots across 16px: x = 3, 6, 9, 12
-const uint8_t MenuMode::DOT_X[NUM_OPTIONS] = {3, 6, 9, 12};
+// 5 dots across 16px: x = 2, 5, 8, 11, 14
+const uint8_t MenuMode::DOT_X[NUM_OPTIONS] = {2, 5, 8, 11, 14};
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
@@ -83,7 +86,7 @@ void MenuMode::drawFrame(Canvas& canvas) {
     for (uint8_t i = 0; i < NUM_OPTIONS; i++) {
         uint8_t dot[3];
         if (i == currentOption) {
-            // Active dot: use the mode's accent color (slightly dimmed)
+            // Active dot: use the mode's accent color
             dot[0] = COLORS[i][0];
             dot[1] = COLORS[i][1];
             dot[2] = COLORS[i][2];

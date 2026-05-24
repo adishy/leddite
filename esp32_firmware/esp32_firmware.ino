@@ -5,13 +5,15 @@
 //   NT  Network Canvas    — existing WebSocket binary protocol (unchanged)
 //   PT  Pattern Slideshow — rainbow, lava lamp, pulse, sparkle
 //   TM  Visual Timer      — rotary encoder sets minutes, progress bar countdown
+//   OC  Octopus Dance     — animated chibi octopus; encoder cycles colour style
 //
 // Encoder: CLK=32, DT=33, SW=25
 //   Menu:    turn = navigate, press = select
 //   CK/PT:   press = back to menu
 //   TM:      turn = adjust minutes / press = start/cancel / press when done = menu
+//   OC:      turn = next style, press = next style (both cycle); long-press = menu
 //   NT:      encoder events broadcast as JSON to connected clients
-//            long-press (2s) = back to menu
+//            long-press (3s) = back to menu
 //
 // Binary WebSocket protocol on port 81: UNCHANGED from V2 original.
 // Encoder state broadcast (Network mode only):
@@ -39,6 +41,7 @@
 #include "PatternMode.h"
 #include "TimerMode.h"
 #include "NetworkMode.h"
+#include "OctopusMode.h"
 
 // ── Config ────────────────────────────────────────────────────────────────────
 #define LED_PIN              4
@@ -60,6 +63,7 @@ TimeMode     timeMode;
 PatternMode  patternMode;
 TimerMode    timerMode;
 NetworkMode  networkMode;
+OctopusMode  octopusMode;
 
 AppMode currentMode = AppMode::MENU;
 
@@ -221,6 +225,10 @@ void loop() {
                         Serial.println("[Menu] → Visual Timer");
                         timerMode.begin(canvas);
                         break;
+                    case AppMode::OCTOPUS:
+                        Serial.println("[Menu] → Octopus Dance");
+                        octopusMode.begin(canvas);
+                        break;
                     default:
                         break;
                 }
@@ -261,6 +269,18 @@ void loop() {
                 }
             }
             timerMode.update(canvas);
+            break;
+
+        // ── OCTOPUS DANCE ─────────────────────────────────────────────────────
+        case AppMode::OCTOPUS:
+            // Turn or short press: cycle to next colour style
+            if (ev.delta) {
+                octopusMode.onEncoderTurn(ev.delta);
+            }
+            if (ev.pressed) {
+                octopusMode.nextStyle();
+            }
+            octopusMode.update(canvas);
             break;
 
         // ── NETWORK CANVAS ────────────────────────────────────────────────────
