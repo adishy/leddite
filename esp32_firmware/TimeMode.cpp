@@ -11,11 +11,18 @@ const char* const TimeMode::MONTH_ABBREVS[12] = {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
+void TimeMode::begin(Canvas& canvas, MarqueeEngine& marquee) {
+    marquee.stop();
+    lastSwitchMs = millis();
+    lastMinute   = -1;   // force immediate clock render
+    showingClock = true;
+    showClock(canvas);
+}
+
 void TimeMode::toggleDisplay(Canvas& canvas, MarqueeEngine& marquee) {
-    // Manually switch between clock and date, resetting the auto-switch timer
     showingClock = !showingClock;
     lastSwitchMs = millis();
-    lastMinute   = -1;  // force clock redraw
+    lastMinute   = -1;
     if (showingClock) {
         marquee.stop();
         showClock(canvas);
@@ -24,22 +31,14 @@ void TimeMode::toggleDisplay(Canvas& canvas, MarqueeEngine& marquee) {
     }
 }
 
-void TimeMode::begin(Canvas& canvas, MarqueeEngine& marquee) {
-    marquee.stop();
-    lastSwitchMs = millis();
-    lastMinute   = -1;   // force immediate render
-    showingClock = true;
-    showClock(canvas);
-}
-
 void TimeMode::update(Canvas& canvas, MarqueeEngine& marquee) {
     uint32_t now = millis();
 
-    // Auto-switch between clock and date every SWITCH_INTERVAL_MS
+    // Auto-switch every SWITCH_INTERVAL_MS
     if (now - lastSwitchMs >= SWITCH_INTERVAL_MS) {
         lastSwitchMs = now;
         showingClock = !showingClock;
-        lastMinute   = -1;  // force clock redraw when we switch back to it
+        lastMinute   = -1;
         if (showingClock) {
             marquee.stop();
             showClock(canvas);
@@ -50,19 +49,16 @@ void TimeMode::update(Canvas& canvas, MarqueeEngine& marquee) {
     }
 
     if (showingClock) {
-        // Redraw only when the minute changes to avoid flickering
+        // Redraw only when the minute changes — avoids flicker
         struct tm timeinfo;
-        if (getLocalTime(&timeinfo)) {
-            if (timeinfo.tm_min != lastMinute) {
-                lastMinute = timeinfo.tm_min;
-                showClock(canvas);
-            }
+        if (getLocalTime(&timeinfo) && timeinfo.tm_min != lastMinute) {
+            lastMinute = timeinfo.tm_min;
+            showClock(canvas);
         }
     } else {
-        // Date: drive the marquee scroll each tick (if active)
+        // Drive marquee scroll each tick
         if (marquee.isActive() && dateBufW > 0) {
             int16_t xOff = marquee.getXOffset(now);
-            // Vertical centering: 7px tall in 16px canvas → y = (16-7)/2 = 4
             canvas.drawSprite(dateBuf, (uint8_t)dateBufW, 7, (int8_t)xOff, 4, 0,
                               /*clearBefore=*/true);
         }
@@ -77,17 +73,13 @@ void TimeMode::showClock(Canvas& canvas) {
     struct tm timeinfo;
     bool gotTime = getLocalTime(&timeinfo);
 
-    // ── Hours row (y=1) ──────────────────────────────────────────────────────
-    char hBuf[3] = "--";
-    if (gotTime) {
-        int h12 = timeinfo.tm_hour % 12;
-        if (h12 == 0) h12 = 12;
-        snprintf(hBuf, sizeof(hBuf), "%2d", h12);
-        // Replace leading space with '0' for consistent 2-char width
-        if (hBuf[0] == ' ') hBuf[0] = '0';
-    }
+    // ── Hours row (y=1): 24-hour format, sky blue ────────────────────────────
+    char hBuf[3];
+    if (gotTime) snprintf(hBuf, sizeof(hBuf), "%02d", timeinfo.tm_hour);
+    else         hBuf[0] = '-'; hBuf[1] = '-'; hBuf[2] = '\0';
+
     {
-        const uint8_t color[3] = {120, 200, 255};  // soft blue
+        const uint8_t color[3] = {80, 180, 255};  // sky blue (matches clock dot)
         uint8_t  buf[12 * 7 * 3] = {0};
         uint16_t w = 0, h = 0;
         TextRenderer::renderText(hBuf, buf, w, h, color);
@@ -95,11 +87,13 @@ void TimeMode::showClock(Canvas& canvas) {
         canvas.drawSprite(buf, (uint8_t)w, (uint8_t)h, x, 1, 0, false);
     }
 
-    // ── Minutes row (y=9) ────────────────────────────────────────────────────
-    char mBuf[3] = "--";
+    // ── Minutes row (y=9): same color ────────────────────────────────────────
+    char mBuf[3];
     if (gotTime) snprintf(mBuf, sizeof(mBuf), "%02d", timeinfo.tm_min);
+    else         mBuf[0] = '-'; mBuf[1] = '-'; mBuf[2] = '\0';
+
     {
-        const uint8_t color[3] = {255, 200, 80};  // amber
+        const uint8_t color[3] = {80, 180, 255};  // same sky blue
         uint8_t  buf[12 * 7 * 3] = {0};
         uint16_t w = 0, h = 0;
         TextRenderer::renderText(mBuf, buf, w, h, color);
@@ -109,24 +103,26 @@ void TimeMode::showClock(Canvas& canvas) {
 }
 
 void TimeMode::showDate(Canvas& canvas, MarqueeEngine& marquee) {
-    // Build "DD MMM" string, e.g. "23 MAY"
+    // Build "DD MMM YYYY" — e.g. "23 MAY 2026"
     struct tm timeinfo;
-    char dateStr[8] = "-- ---";
+    char dateStr[13] = "-- --- ----";
     if (getLocalTime(&timeinfo)) {
-        snprintf(dateStr, sizeof(dateStr), "%02d %s",
+        snprintf(dateStr, sizeof(dateStr), "%02d %s %04d",
                  timeinfo.tm_mday,
-                 MONTH_ABBREVS[timeinfo.tm_mon]);
+                 MONTH_ABBREVS[timeinfo.tm_mon],
+                 1900 + timeinfo.tm_year);
     }
 
-    // Render into dateBuf (member, persists for scroll duration)
-    const uint8_t color[3] = {100, 255, 180};  // mint green
+    // Render into dateBuf (member — persists for scroll duration)
+    const uint8_t color[3] = {80, 255, 120};  // mint green (matches network dot)
     uint16_t h = 0;
+    memset(dateBuf, 0, sizeof(dateBuf));
     TextRenderer::renderText(dateStr, dateBuf, dateBufW, h, color);
 
-    // Start marquee scrolling (scrolls left from x=16 to x=-dateBufW)
-    marquee.start(dateBuf, dateBufW, 7, MARQUEE_SPEED_PPS, millis());
+    // Start marquee: scrolls from x=16 (right edge) to x=-dateBufW (off left)
+    marquee.start(dateBuf, dateBufW, 7, DATE_SPEED_PPS, millis());
 
-    // Initial frame: position at right edge
+    // Initial frame at right edge
     canvas.clear();
     canvas.drawSprite(dateBuf, (uint8_t)dateBufW, 7, 16, 4, 0, false);
 }

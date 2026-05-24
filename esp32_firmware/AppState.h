@@ -7,4 +7,5 @@ enum class AppMode {
     NETWORK,    // Network Canvas: WebSocket binary protocol (unchanged), encoder events broadcast
     PATTERN,    // Pattern Slideshow: lava lamp / rainbow / pulse / sparkle
     TIMER,      // Visual Timer: encoder sets minutes, press starts countdown
+    OFF,        // Screen off: LEDs blanked, short press wakes to menu
 };

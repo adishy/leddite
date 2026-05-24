@@ -1,13 +1,14 @@
 #include "MenuMode.h"
-#include "TextRenderer.h"
+#include <Arduino.h>
+#include <string.h>
 
 // ── Static data ───────────────────────────────────────────────────────────────
 
 const char* const MenuMode::LABELS[NUM_OPTIONS] = {
-    "CK",   // Clock + Calendar
-    "NT",   // Network Canvas
-    "PT",   // Pattern Slideshow
-    "TM",   // Visual Timer
+    "CLOCK + CALENDAR",   // 16 chars × 6 = 96px wide
+    "NETWORK CANVAS",     // 14 chars × 6 = 84px wide
+    "PATTERN SHOW",       // 12 chars × 6 = 72px wide
+    "VISUAL TIMER",       // 12 chars × 6 = 72px wide
 };
 
 const AppMode MenuMode::MODES[NUM_OPTIONS] = {
@@ -17,60 +18,77 @@ const AppMode MenuMode::MODES[NUM_OPTIONS] = {
     AppMode::TIMER,
 };
 
-// Accent color per mode label
+// Distinct accent color per mode
 const uint8_t MenuMode::COLORS[NUM_OPTIONS][3] = {
-    {100, 200, 255},  // CK: cyan-blue
-    {100, 255, 100},  // NT: green
-    {255, 100, 200},  // PT: magenta
-    {255, 200,  80},  // TM: amber
+    {  80, 180, 255},  // clock+cal:  sky blue
+    {  80, 255, 120},  // network:    mint green
+    { 255,  80, 200},  // pattern:    hot magenta
+    { 255, 200,  60},  // timer:      warm amber
 };
 
-// 4 dots spaced evenly: x=3,6,9,12 across 16px canvas
+// 4 dots across 16px: x = 3, 6, 9, 12
 const uint8_t MenuMode::DOT_X[NUM_OPTIONS] = {3, 6, 9, 12};
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
 void MenuMode::begin(Canvas& canvas) {
     currentOption = 0;
-    render(canvas);
+    startNameScroll();
+    drawFrame(canvas);
 }
 
 void MenuMode::onEncoderTurn(int delta, Canvas& canvas) {
     currentOption = (uint8_t)((currentOption + NUM_OPTIONS + delta) % NUM_OPTIONS);
-    render(canvas);
+    startNameScroll();
+    drawFrame(canvas);  // immediate visual update on same loop tick
+}
+
+void MenuMode::update(Canvas& canvas) {
+    if (menuMarquee.isActive()) {
+        drawFrame(canvas);
+    }
 }
 
 AppMode MenuMode::onEncoderPress(Canvas& canvas) {
-    (void)canvas; // New mode's begin() handles the canvas transition
+    (void)canvas;
+    menuMarquee.stop();
     return MODES[currentOption];
 }
 
-// ── Render ────────────────────────────────────────────────────────────────────
+// ── Private ───────────────────────────────────────────────────────────────────
 
-void MenuMode::render(Canvas& canvas) {
+void MenuMode::startNameScroll() {
+    const char*    label = LABELS[currentOption];
+    const uint8_t* color = COLORS[currentOption];
+
+    uint16_t h = 0;
+    memset(nameBuf, 0, sizeof(nameBuf));
+    TextRenderer::renderText(label, nameBuf, nameBufW, h, color);
+
+    // Start marquee from x=16 (right edge of display) scrolling left
+    menuMarquee.start(nameBuf, nameBufW, 7, MARQUEE_SPEED, millis());
+}
+
+void MenuMode::drawFrame(Canvas& canvas) {
     canvas.clear();
 
-    // ── Mode label ────────────────────────────────────────────────────────────
-    // 2-char label = 12px wide, 7px tall.
-    // Center horizontally: x = (16 - 12) / 2 = 2
-    // Position in upper area: y = 3  (leaves bottom 3 rows for dots)
-    const char*    label = LABELS[currentOption];
-    const uint8_t* col   = COLORS[currentOption];
-
-    uint8_t  textBuf[12 * 7 * 3] = {0};
-    uint16_t w = 0, h = 0;
-    TextRenderer::renderText(label, textBuf, w, h, col);
-
-    int8_t xOff = (int8_t)((16 - (int16_t)w) / 2);  // center: (16-12)/2 = 2
-    canvas.drawSprite(textBuf, (uint8_t)w, (uint8_t)h, xOff, 3, 0, /*clearBefore=*/false);
+    // ── Scrolling name ────────────────────────────────────────────────────────
+    // Vertically centered in the top 13 rows: y = (13 - 7) / 2 = 3
+    if (menuMarquee.isActive() && nameBufW > 0) {
+        int16_t xOff = menuMarquee.getXOffset(millis());
+        canvas.drawSprite(nameBuf, (uint8_t)nameBufW, 7, (int8_t)xOff, 3, 0, false);
+    }
 
     // ── Indicator dots ────────────────────────────────────────────────────────
     for (uint8_t i = 0; i < NUM_OPTIONS; i++) {
         uint8_t dot[3];
         if (i == currentOption) {
-            dot[0] = 255; dot[1] = 255; dot[2] = 255;  // selected: bright white
+            // Active dot: use the mode's accent color (slightly dimmed)
+            dot[0] = COLORS[i][0];
+            dot[1] = COLORS[i][1];
+            dot[2] = COLORS[i][2];
         } else {
-            dot[0] = 30;  dot[1] = 30;  dot[2] = 30;   // unselected: dim grey
+            dot[0] = 25; dot[1] = 25; dot[2] = 25;  // dim grey
         }
         canvas.drawSprite(dot, 1, 1, (int8_t)DOT_X[i], (int8_t)DOT_Y, 0, false);
     }

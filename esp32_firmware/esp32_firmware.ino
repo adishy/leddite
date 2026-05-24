@@ -163,13 +163,34 @@ static void goToMenu() {
 void loop() {
     EncoderEvent ev = encoder.poll();
 
-    // ── Universal long-press: back to menu from anywhere (3s hold) ────────────
-    // Checked before per-mode dispatch so every mode gets "home" for free.
-    // Exception: in MENU itself a long press is a no-op (already home).
-    if (ev.longPress && currentMode != AppMode::MENU) {
-        goToMenu();
-        updateDisplay();
-        return;
+    // ── Long-press logic (3s hold) ────────────────────────────────────────────
+    if (ev.longPress) {
+        if (currentMode == AppMode::MENU) {
+            // MENU long-press → screen off
+            marquee.stop();
+            canvas.clear();
+            FastLED.clear(true);   // immediately push black to all LEDs
+            currentMode = AppMode::OFF;
+            Serial.println("[Menu] Screen off — short press to wake");
+            return;
+        } else if (currentMode != AppMode::OFF) {
+            // Any other active mode → back to menu
+            goToMenu();
+            updateDisplay();
+            return;
+        }
+        // OFF long-press: ignored (already off)
+    }
+
+    // ── Screen-off mode ───────────────────────────────────────────────────────
+    // LEDs are black; only short press wakes. Skip updateDisplay() so LEDs
+    // stay off without re-pushing the canvas every tick.
+    if (currentMode == AppMode::OFF) {
+        if (ev.pressed) {
+            goToMenu();
+            updateDisplay();
+        }
+        return;  // intentionally skip updateDisplay() at bottom of loop
     }
 
     switch (currentMode) {
@@ -203,6 +224,9 @@ void loop() {
                     default:
                         break;
                 }
+            } else {
+                // Advance the name marquee scroll every tick (no selection this frame)
+                menuMode.update(canvas);
             }
             break;
 
