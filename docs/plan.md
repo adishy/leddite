@@ -49,8 +49,12 @@ Refactor `leddite` into a high-performance, "Sprite-based" API for controlling a
 - [ ] Handle variable-length binary payloads efficiently.
 
 ### Phase 4: Hardware Integration
-- [ ] FastLED setup on ESP32.
-- [ ] Physical serpentine mapping implementation.
+- [x] FastLED setup on ESP32.
+- [x] Physical serpentine mapping implementation.
+  - Panel is mounted 90° rotated; serpentine is **column-based right→left**.
+  - `getPhysicalIndex`: even columns top→bottom `(15-x)*16+y`, odd columns bottom→top `(15-x)*16+(15-y)`.
+  - Validated via dedicated diagnostic firmware (corner pixels, row/column scans, raw LED index tests).
+  - See `docs/Components/HardwareMapping.md`.
 
 ### Phase 5: JS Simulator
 - [x] 16x16 CSS grid UI.
@@ -63,5 +67,7 @@ Refactor `leddite` into a high-performance, "Sprite-based" API for controlling a
 - [ ] Verify multi-sprite layering (e.g., background + moving icon).
 
 ### Phase 7: API Documentation
+- [x] Hardware mapping documented in `docs/Components/HardwareMapping.md`.
+- [x] Firmware flashing guide in `esp32_firmware/README.md`.
 - [ ] Finalize `API.md` with binary protocol details, flag definitions, and usage examples.
 - [ ] Optimize for readability by other LLM agents/developers.
