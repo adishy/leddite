@@ -140,3 +140,6 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 .env.secrets
+
+# WiFi credentials — never commit
+esp32_firmware/wifi_credentials.h
