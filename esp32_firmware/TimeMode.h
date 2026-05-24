@@ -5,39 +5,50 @@
 #include <stdint.h>
 #include <time.h>
 
-// TimeMode — Clock + Calendar display.
+// TimeMode — Clock + Calendar display with DVD screensaver bounce.
 //
-// CLOCK view:  static 24-hour display — HH centered on top row (y=1),
-//              MM centered on bottom row (y=9). Redraws only on minute change.
+// CLOCK view:  HH (blue) over MM (pink), 12×15 px block.
+//              Block bounces 1 px/sec around the 16×16 canvas (MAX_X=4, MAX_Y=1).
 //
-// CALENDAR view: "23 MAY 2026" scrolling marquee in mint-green.
+// CALENDAR view: DD (blue) over MM-number (pink), same bounce logic.
 //
-// Auto-switches every SWITCH_INTERVAL_MS (5s).
-// Short press (from .ino): toggleDisplay() skips to the other view early.
+// Auto-switches every SWITCH_INTERVAL_MS (10 s).
+// Short press (from .ino): toggleDisplay() skips to the other view immediately.
+//
+// Geometry:
+//   FACE_W = textWidth("HH") = 12 px
+//   FACE_H = 7 + 1 gap + 7   = 15 px
+//   MAX_X  = 16 - 12          = 4
+//   MAX_Y  = 16 - 15          = 1
 //
 // Call begin() on mode entry; update() every loop iteration.
-// Caller must call marquee.stop() before switching away.
+// Caller must call marquee.stop() before switching away (kept for API compat).
 class TimeMode {
 public:
-    static const uint32_t SWITCH_INTERVAL_MS = 5000;
-    static const uint16_t DATE_SPEED_PPS     = 30;  // px/sec for calendar scroll
+    static const uint32_t SWITCH_INTERVAL_MS = 10000;  // 10 s between clock↔date
 
     void begin(Canvas& canvas, MarqueeEngine& marquee);
     void update(Canvas& canvas, MarqueeEngine& marquee);
     void toggleDisplay(Canvas& canvas, MarqueeEngine& marquee);
 
 private:
-    void showClock(Canvas& canvas);                         // static 24h two-row display
-    void showDate(Canvas& canvas, MarqueeEngine& marquee);  // start date marquee
+    static const uint8_t FACE_W = 12;  // textWidth("HH")
+    static const uint8_t FACE_H = 15;  // 7 + 1 + 7
+    static const uint8_t MAX_X  = 4;   // 16 - FACE_W
+    static const uint8_t MAX_Y  = 1;   // 16 - FACE_H
+
+    void showFace(Canvas& canvas);  // render current view at dvdX/dvdY
 
     uint32_t lastSwitchMs = 0;
     bool     showingClock = true;
-    int      lastMinute   = -1;
+    time_t   lastDrawSec  = 0;  // tracks per-second position updates
 
-    // Date sprite buffer: "23 MAY 2026" = 11 chars × 6px × 7px × 3 bytes = 1386 bytes
-    static const uint16_t DATE_BUF_CHARS = 12;
-    uint8_t  dateBuf[DATE_BUF_CHARS * 6 * 7 * 3];
-    uint16_t dateBufW = 0;
+    // DVD screensaver position + velocity
+    int8_t dvdX  = 2;   // start roughly centred
+    int8_t dvdY  = 0;
+    int8_t dvdDX = 1;
+    int8_t dvdDY = 1;
 
-    static const char* const MONTH_ABBREVS[12];
+    // Reusable row render buffer — fits one 2-char row (12×7×3 = 252 bytes)
+    uint8_t faceBuf[12 * 7 * 3];
 };

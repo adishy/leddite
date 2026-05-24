@@ -271,15 +271,12 @@ void loop() {
             timerMode.update(canvas);
             break;
 
-        // ── OCTOPUS DANCE ─────────────────────────────────────────────────────
+        // ── CHARACTERS ────────────────────────────────────────────────────────
         case AppMode::OCTOPUS:
-            // Turn or short press: cycle to next colour style
-            if (ev.delta) {
-                octopusMode.onEncoderTurn(ev.delta);
-            }
-            if (ev.pressed) {
-                octopusMode.nextStyle();
-            }
+            // Turn: cycle character (Ghost ↔ Nyan Cat)
+            // Press: cycle colour style within current character
+            if (ev.delta)   octopusMode.onEncoderTurn(ev.delta);
+            if (ev.pressed) octopusMode.onEncoderPress();
             octopusMode.update(canvas);
             break;
 

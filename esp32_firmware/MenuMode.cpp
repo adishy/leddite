@@ -9,7 +9,7 @@ const char* const MenuMode::LABELS[NUM_OPTIONS] = {
     "NETWORK CANVAS",     // 14 chars × 6 = 84px wide
     "PATTERN SHOW",       // 12 chars × 6 = 72px wide
     "VISUAL TIMER",       // 12 chars × 6 = 72px wide
-    "OCTOPUS DANCE",      // 13 chars × 6 = 78px wide
+    "CHARACTERS",         // 10 chars × 6 = 60px wide
 };
 
 const AppMode MenuMode::MODES[NUM_OPTIONS] = {
