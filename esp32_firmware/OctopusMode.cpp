@@ -3,13 +3,13 @@
 #include <string.h>
 
 // ── Colour palettes ───────────────────────────────────────────────────────────
-//                         top body          bot body          highlight         sclera            pupil
+//                         top body          bot body          highlight
 const OctopusMode::Style OctopusMode::STYLES[OctopusMode::NUM_STYLES] = {
-    { 110,190,255,  60,130,220, 200,230,255, 240,245,255,  20, 50,110 },  // 0: Pale Blue Ocean
-    {  60,200, 90, 130,195, 35, 190,240,150, 255,255,215,  25, 70, 15 },  // 1: Verdant Meadow
-    { 170, 80,230,  90, 40,175, 210,145,255, 255,230,255,  55, 20, 95 },  // 2: Amethyst Dream
-    { 245,120, 85, 200, 65, 45, 255,185,155, 255,245,230,  85, 30, 15 },  // 3: Coral Sunset
-    { 245,195, 40, 200,145,  5, 255,235,130, 255,255,220,  75, 45,  0 },  // 4: Golden Star
+    { 110,190,255,  60,130,220, 200,230,255 },  // 0: Pale Blue Ocean
+    {  60,200, 90, 130,195, 35, 190,240,150 },  // 1: Verdant Meadow
+    { 170, 80,230,  90, 40,175, 210,145,255 },  // 2: Amethyst Dream
+    { 245,120, 85, 200, 65, 45, 255,185,155 },  // 3: Coral Sunset
+    { 245,195, 40, 200,145,  5, 255,235,130 },  // 4: Golden Star
 };
 
 // ── Animation tables ──────────────────────────────────────────────────────────
@@ -31,31 +31,31 @@ const OctopusMode::Span OctopusMode::BODY[9] = {
     {5, 10},  // row 8 → y=9  (mantle base)
 };
 
-// ── Eight tentacles — two phases ─────────────────────────────────────────────
+// ── Eight tentacles — straight vertical lines ─────────────────────────────────
+// Both phases are identical; the bob animation (yOff) provides the movement.
 // [phase][tentacle 0-7][point 0-4][x, y]
-// y values are absolute canvas coords at yOff=0; yOff is added at draw time.
 const uint8_t OctopusMode::TENT[2][OctopusMode::NUM_TENTACLES][5][2] = {
-    // ── Phase 0 (rest) ───────────────────────────────────────────────────────
+    // ── Phase 0 ──────────────────────────────────────────────────────────────
     {
-        {{ 1,10},{ 0,11},{ 1,12},{ 0,13},{ 1,14}},  // T0  far-left outer
-        {{ 3,10},{ 3,11},{ 2,12},{ 3,13},{ 3,14}},  // T1  far-left inner
-        {{ 5,10},{ 5,11},{ 4,12},{ 5,13},{ 5,14}},  // T2  left
-        {{ 7,10},{ 7,11},{ 8,12},{ 7,13},{ 7,14}},  // T3  centre-left
-        {{ 8,10},{ 8,11},{ 7,12},{ 8,13},{ 8,14}},  // T4  centre-right
-        {{10,10},{10,11},{11,12},{10,13},{10,14}},   // T5  right
-        {{12,10},{12,11},{13,12},{12,13},{12,14}},   // T6  far-right inner
-        {{14,10},{15,11},{14,12},{15,13},{14,14}},   // T7  far-right outer
+        {{ 1,10},{ 1,11},{ 1,12},{ 1,13},{ 1,14}},  // T0  far-left outer
+        {{ 3,10},{ 3,11},{ 3,12},{ 3,13},{ 3,14}},  // T1  far-left inner
+        {{ 5,10},{ 5,11},{ 5,12},{ 5,13},{ 5,14}},  // T2  left
+        {{ 7,10},{ 7,11},{ 7,12},{ 7,13},{ 7,14}},  // T3  centre-left
+        {{ 8,10},{ 8,11},{ 8,12},{ 8,13},{ 8,14}},  // T4  centre-right
+        {{10,10},{10,11},{10,12},{10,13},{10,14}},   // T5  right
+        {{12,10},{12,11},{12,12},{12,13},{12,14}},   // T6  far-right inner
+        {{14,10},{14,11},{14,12},{14,13},{14,14}},   // T7  far-right outer
     },
-    // ── Phase 1 (waved) ──────────────────────────────────────────────────────
+    // ── Phase 1 (same — straight lines don't wave) ───────────────────────────
     {
-        {{ 2,10},{ 1,11},{ 0,12},{ 1,13},{ 2,14}},  // T0
-        {{ 3,10},{ 2,11},{ 3,12},{ 4,13},{ 3,14}},  // T1
-        {{ 5,10},{ 6,11},{ 5,12},{ 4,13},{ 5,14}},  // T2
-        {{ 7,10},{ 8,11},{ 9,12},{ 8,13},{ 7,14}},  // T3
-        {{ 8,10},{ 7,11},{ 6,12},{ 7,13},{ 8,14}},  // T4
-        {{10,10},{ 9,11},{10,12},{11,13},{10,14}},   // T5
-        {{12,10},{13,11},{12,12},{11,13},{12,14}},   // T6
-        {{14,10},{13,11},{14,12},{15,13},{14,14}},   // T7
+        {{ 1,10},{ 1,11},{ 1,12},{ 1,13},{ 1,14}},
+        {{ 3,10},{ 3,11},{ 3,12},{ 3,13},{ 3,14}},
+        {{ 5,10},{ 5,11},{ 5,12},{ 5,13},{ 5,14}},
+        {{ 7,10},{ 7,11},{ 7,12},{ 7,13},{ 7,14}},
+        {{ 8,10},{ 8,11},{ 8,12},{ 8,13},{ 8,14}},
+        {{10,10},{10,11},{10,12},{10,13},{10,14}},
+        {{12,10},{12,11},{12,12},{12,13},{12,14}},
+        {{14,10},{14,11},{14,12},{14,13},{14,14}},
     },
 };
 
@@ -163,50 +163,49 @@ void OctopusMode::drawFrame(Canvas& canvas, int8_t yOff, uint8_t tentPhase,
     px(frameBuf, 5, 2 + (int)yOff, s.hiR, s.hiG, s.hiB);
 
     // ── Eyes ──────────────────────────────────────────────────────────────────
+    // White sclera + black pupil — hardcoded for maximum contrast on any body colour.
     if (!eyesClosed) {
-        // Left eye — 3×3 sclera at (3..5, 3+yOff..5+yOff)
+        // Left eye — 3×3 white sclera at (3..5, 3..5+yOff)
         for (int ey = 3; ey <= 5; ey++) {
             int y = ey + (int)yOff;
             if (y < 0 || y >= 16) continue;
-            px(frameBuf, 3, y, s.eyeR, s.eyeG, s.eyeB);
-            px(frameBuf, 4, y, s.eyeR, s.eyeG, s.eyeB);
-            px(frameBuf, 5, y, s.eyeR, s.eyeG, s.eyeB);
+            px(frameBuf, 3, y, 255, 255, 255);
+            px(frameBuf, 4, y, 255, 255, 255);
+            px(frameBuf, 5, y, 255, 255, 255);
         }
-        // Left pupil — 2×2 at (4..5, 4+yOff..5+yOff)
+        // Left pupil — 2×2 black at (4..5, 4..5+yOff)
         for (int ey = 4; ey <= 5; ey++) {
             int y = ey + (int)yOff;
             if (y < 0 || y >= 16) continue;
-            px(frameBuf, 4, y, s.pupR, s.pupG, s.pupB);
-            px(frameBuf, 5, y, s.pupR, s.pupG, s.pupB);
+            px(frameBuf, 4, y, 0, 0, 0);
+            px(frameBuf, 5, y, 0, 0, 0);
         }
-        px(frameBuf, 3, 3 + (int)yOff, 255, 255, 255);  // left highlight dot
 
-        // Right eye — 3×3 sclera at (10..12, 3+yOff..5+yOff)
+        // Right eye — 3×3 white sclera at (10..12, 3..5+yOff)
         for (int ey = 3; ey <= 5; ey++) {
             int y = ey + (int)yOff;
             if (y < 0 || y >= 16) continue;
-            px(frameBuf, 10, y, s.eyeR, s.eyeG, s.eyeB);
-            px(frameBuf, 11, y, s.eyeR, s.eyeG, s.eyeB);
-            px(frameBuf, 12, y, s.eyeR, s.eyeG, s.eyeB);
+            px(frameBuf, 10, y, 255, 255, 255);
+            px(frameBuf, 11, y, 255, 255, 255);
+            px(frameBuf, 12, y, 255, 255, 255);
         }
-        // Right pupil — 2×2 at (10..11, 4+yOff..5+yOff)
+        // Right pupil — 2×2 black at (10..11, 4..5+yOff)
         for (int ey = 4; ey <= 5; ey++) {
             int y = ey + (int)yOff;
             if (y < 0 || y >= 16) continue;
-            px(frameBuf, 10, y, s.pupR, s.pupG, s.pupB);
-            px(frameBuf, 11, y, s.pupR, s.pupG, s.pupB);
+            px(frameBuf, 10, y, 0, 0, 0);
+            px(frameBuf, 11, y, 0, 0, 0);
         }
-        px(frameBuf, 12, 3 + (int)yOff, 255, 255, 255);  // right highlight dot
     } else {
-        // Blink: thin horizontal squiggle where the eye was
+        // Blink: thin white horizontal line where sclera was (closed eyelid)
         int y = 4 + (int)yOff;
         if (y >= 0 && y < 16) {
-            px(frameBuf,  3, y, s.pupR, s.pupG, s.pupB);
-            px(frameBuf,  4, y, s.pupR, s.pupG, s.pupB);
-            px(frameBuf,  5, y, s.pupR, s.pupG, s.pupB);
-            px(frameBuf, 10, y, s.pupR, s.pupG, s.pupB);
-            px(frameBuf, 11, y, s.pupR, s.pupG, s.pupB);
-            px(frameBuf, 12, y, s.pupR, s.pupG, s.pupB);
+            px(frameBuf,  3, y, 255, 255, 255);
+            px(frameBuf,  4, y, 255, 255, 255);
+            px(frameBuf,  5, y, 255, 255, 255);
+            px(frameBuf, 10, y, 255, 255, 255);
+            px(frameBuf, 11, y, 255, 255, 255);
+            px(frameBuf, 12, y, 255, 255, 255);
         }
     }
 

@@ -27,8 +27,7 @@ private:
         uint8_t topR, topG, topB;   // upper body
         uint8_t botR, botG, botB;   // lower body + tentacles
         uint8_t hiR,  hiG,  hiB;   // specular highlight
-        uint8_t eyeR, eyeG, eyeB;  // eye sclera
-        uint8_t pupR, pupG, pupB;  // pupil
+        // Eyes are always white sclera + black pupil for maximum contrast
     };
     static const Style STYLES[NUM_STYLES];
 
