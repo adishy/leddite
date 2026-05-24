@@ -50,6 +50,21 @@
 #define WS_PORT              81
 #define MARQUEE_BUFFER_SIZE  4096
 
+// ── Safety limits ─────────────────────────────────────────────────────────────
+// WS2812B draws ~60 mA/LED at full white.  256 LEDs × 60 mA = 15.4 A peak.
+// Two layers of protection, both applied silently at the physical layer:
+//
+//  1. PER-PIXEL CAP (PIXEL_SCALE_NUM/DEN): each R/G/B channel is scaled to 80%
+//     before being handed to FastLED.  255,255,255 → 204,204,204.  Mode code
+//     never sees this — the canvas buffer always holds the unmodified values.
+//
+//  2. GLOBAL POWER BUDGET (MAX_MILLIAMPS_5V): FastLED automatically reduces its
+//     global brightness multiplier if the computed draw would exceed this limit.
+//     Acts as a hard ceiling even if brightness is raised elsewhere at runtime.
+#define PIXEL_SCALE_NUM      204     // numerator   — 204/255 ≈ 80 %
+#define PIXEL_SCALE_DEN      255     // denominator
+#define MAX_MILLIAMPS_5V     3000    // mA — safe for most USB-C / bench supplies
+
 // ── Global state ──────────────────────────────────────────────────────────────
 WebSocketsServer webSocket(WS_PORT);
 Canvas           canvas;
@@ -76,11 +91,19 @@ uint16_t getPhysicalIndex(uint8_t x, uint8_t y) {
 
 void updateDisplay() {
     const LedditeCRGB* buf = canvas.getBuffer();
-    for (uint8_t y = 0; y < 16; y++)
+    for (uint8_t y = 0; y < 16; y++) {
         for (uint8_t x = 0; x < 16; x++) {
             LedditeCRGB p = buf[y * 16 + x];
-            leds[getPhysicalIndex(x, y)] = CRGB(p.r, p.g, p.b);
+            // Per-pixel brightness cap (physical layer only — canvas is unchanged).
+            // Scales every channel to PIXEL_SCALE_NUM/DEN (≈ 80 %) so that no LED
+            // ever reaches full drive current regardless of what modes write.
+            leds[getPhysicalIndex(x, y)] = CRGB(
+                (uint8_t)(p.r * PIXEL_SCALE_NUM / PIXEL_SCALE_DEN),
+                (uint8_t)(p.g * PIXEL_SCALE_NUM / PIXEL_SCALE_DEN),
+                (uint8_t)(p.b * PIXEL_SCALE_NUM / PIXEL_SCALE_DEN)
+            );
         }
+    }
     FastLED.show();
 }
 
@@ -101,6 +124,7 @@ void setup() {
     // LEDs — init early for visual feedback during boot
     FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
     FastLED.setBrightness(BRIGHTNESS);
+    FastLED.setMaxPowerInVoltsAndMilliamps(5, MAX_MILLIAMPS_5V);  // global power budget
     FastLED.clear();
     FastLED.show();
 
