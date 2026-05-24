@@ -1,135 +1,180 @@
-// Ground-truth solid-fill firmware.
-// Uses the EXACT mapping functions copy-pasted from the proven legacy firmware
-// (esp32_visual_timer/led_rotary_enc_visual_timer.ino) with zero modifications.
-// No Canvas, no encoder, no WiFi — purely FastLED with the legacy addressing.
-//
-// Phase A: fill_solid() straight into leds[] — bypasses ALL custom mapping
-// Phase B: setPixel_Final() loop — uses the legacy proven mapping
-// If A and B match, the mapping is correct.
+// MAPPING DIAGNOSTIC — shows one pattern at a time, 3s each.
+// Watch the display and match what you see to the serial label.
+// This will tell us exactly what the correct getPhysicalIndex should be.
 
 #include <FastLED.h>
+#include "Canvas.h"
 
-#define LED_DATA_PIN    4
-#define LED_TYPE        WS2812B
-#define COLOR_ORDER     GRB
-#define NUM_LEDS        256
-#define BRIGHTNESS      64
-const int PANEL_WIDTH  = 16;
-const int PANEL_HEIGHT = 16;
+#define LED_PIN    4
+#define NUM_LEDS   256
+#define BRIGHTNESS 64
 
 CRGB leds[NUM_LEDS];
+Canvas canvas;
 
-// -------------------------------------------------------
-// LEGACY MAPPING — copied verbatim from
-// esp32_visual_timer/led_rotary_enc_visual_timer.ino
-// -------------------------------------------------------
-uint16_t XY_Serpentine_Original(uint8_t col, uint8_t row) {
-    if (col >= PANEL_WIDTH || row >= PANEL_HEIGHT) {
-        return NUM_LEDS;
+// Current best-guess mapping (column-based serpentine, derived from legacy firmware).
+// We will verify this is correct via the patterns below.
+uint16_t getPhysicalIndex(uint8_t x, uint8_t y) {
+    if (x % 2 == 0) {
+        return (15 - x) * 16 + y;
+    } else {
+        return (15 - x) * 16 + (15 - y);
     }
-    uint16_t i;
-    if (row % 2 == 0) { // Even rows: L to R
-        i = (row * PANEL_WIDTH) + col;
-    } else { // Odd rows: R to L
-        i = (row * PANEL_WIDTH) + (PANEL_WIDTH - 1 - col);
-    }
-    return i;
 }
 
-void setPixel_Final(int final_canvas_x, int final_canvas_y, CRGB color) {
-    if (final_canvas_x < 0 || final_canvas_x >= PANEL_WIDTH ||
-        final_canvas_y < 0 || final_canvas_y >= PANEL_HEIGHT) {
-        return;
-    }
-    int x_on_180_canvas = (PANEL_HEIGHT - 1) - final_canvas_y;
-    int y_on_180_canvas = final_canvas_x;
-    uint16_t serpentine_index_for_original_panel =
-        XY_Serpentine_Original(x_on_180_canvas, y_on_180_canvas);
-    uint16_t physical_led_index = (NUM_LEDS - 1) - serpentine_index_for_original_panel;
-    if (physical_led_index < NUM_LEDS) {
-        leds[physical_led_index] = color;
-    }
-}
-// -------------------------------------------------------
-
-void legacyFill(CRGB color) {
-    for (int y = 0; y < PANEL_HEIGHT; y++) {
-        for (int x = 0; x < PANEL_WIDTH; x++) {
-            setPixel_Final(x, y, color);
+void updateDisplay() {
+    const LedditeCRGB* buf = canvas.getBuffer();
+    for (uint8_t y = 0; y < 16; y++) {
+        for (uint8_t x = 0; x < 16; x++) {
+            LedditeCRGB px = buf[y * 16 + x];
+            leds[getPhysicalIndex(x, y)] = CRGB(px.r, px.g, px.b);
         }
     }
     FastLED.show();
 }
 
+void showPixel(uint8_t x, uint8_t y, CRGB color) {
+    canvas.clear();
+    uint8_t px[3] = { color.r, color.g, color.b };
+    canvas.drawSprite(px, 1, 1, x, y, 0, false);
+    updateDisplay();
+}
+
+void showRow(uint8_t row, CRGB color) {
+    canvas.clear();
+    uint8_t rowbuf[16 * 3];
+    for (int i = 0; i < 16; i++) {
+        rowbuf[i*3]   = color.r;
+        rowbuf[i*3+1] = color.g;
+        rowbuf[i*3+2] = color.b;
+    }
+    canvas.drawSprite(rowbuf, 16, 1, 0, row, 0, false);
+    updateDisplay();
+}
+
+void showCol(uint8_t col, CRGB color) {
+    canvas.clear();
+    uint8_t colbuf[16 * 3];
+    for (int i = 0; i < 16; i++) {
+        colbuf[i*3]   = color.r;
+        colbuf[i*3+1] = color.g;
+        colbuf[i*3+2] = color.b;
+    }
+    canvas.drawSprite(colbuf, 1, 16, col, 0, 0, false);
+    updateDisplay();
+}
+
+void solidFill(CRGB color) {
+    fill_solid(leds, NUM_LEDS, color);
+    FastLED.show();
+}
+
+void blank() {
+    FastLED.clear(); FastLED.show();
+}
+
+void step(const char* label, uint32_t ms) {
+    Serial.printf("\n>>> %s\n", label);
+    delay(ms);
+}
+
 void setup() {
     Serial.begin(115200);
-    delay(1000);
-    Serial.println("\n\n=== GROUND TRUTH: Legacy mapping solid fills ===");
-
-    FastLED.addLeds<LED_TYPE, LED_DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS);
+    delay(500);
+    FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
     FastLED.setBrightness(BRIGHTNESS);
-    FastLED.clear();
+    blank();
+
+    Serial.println("\n=== MAPPING DIAGNOSTIC ===");
+    Serial.println("Each step holds for 3s. Note what you see.");
+
+    // ── Sanity: raw fill_solid (no mapping). Should be FULL solid white.
+    solidFill(CRGB::White);
+    step("SANITY: fill_solid WHITE — entire display should be solid white", 3000);
+
+    blank(); delay(500);
+
+    // ── Canvas solid fills — should look identical to fill_solid above
+    uint8_t all[256*3];
+    for(int i=0;i<256;i++){all[i*3]=255;all[i*3+1]=255;all[i*3+2]=255;}
+    canvas.drawSprite(all, 16, 16, 0, 0, 0, true);
+    updateDisplay();
+    step("CANVAS solid WHITE — should also be entire display solid white", 3000);
+
+    blank(); delay(500);
+
+    // ── Single pixel: logical top-left corner (0,0) → GREEN dot
+    showPixel(0, 0, CRGB::Green);
+    step("PIXEL (0,0) GREEN — should be ONE green dot at TOP-LEFT corner", 3000);
+
+    blank(); delay(500);
+
+    // ── Single pixel: logical top-right corner (15,0) → RED dot
+    showPixel(15, 0, CRGB::Red);
+    step("PIXEL (15,0) RED — should be ONE red dot at TOP-RIGHT corner", 3000);
+
+    blank(); delay(500);
+
+    // ── Single pixel: logical bottom-left corner (0,15) → BLUE dot
+    showPixel(0, 15, CRGB::Blue);
+    step("PIXEL (0,15) BLUE — should be ONE blue dot at BOTTOM-LEFT corner", 3000);
+
+    blank(); delay(500);
+
+    // ── Single pixel: logical bottom-right (15,15) → YELLOW dot
+    showPixel(15, 15, CRGB(255,255,0));
+    step("PIXEL (15,15) YELLOW — should be ONE yellow dot at BOTTOM-RIGHT corner", 3000);
+
+    blank(); delay(500);
+
+    // ── Top row (y=0): should be a WHITE horizontal bar across the very top
+    showRow(0, CRGB::White);
+    step("ROW y=0 WHITE — should be a WHITE bar across the TOP edge", 3000);
+
+    blank(); delay(500);
+
+    // ── Bottom row (y=15): should be a WHITE horizontal bar across the very bottom
+    showRow(15, CRGB::White);
+    step("ROW y=15 WHITE — should be a WHITE bar across the BOTTOM edge", 3000);
+
+    blank(); delay(500);
+
+    // ── Left column (x=0): should be a WHITE vertical bar on the left edge
+    showCol(0, CRGB::White);
+    step("COL x=0 WHITE — should be a WHITE bar down the LEFT edge", 3000);
+
+    blank(); delay(500);
+
+    // ── Right column (x=15): should be a WHITE vertical bar on the right edge
+    showCol(15, CRGB::White);
+    step("COL x=15 WHITE — should be a WHITE bar down the RIGHT edge", 3000);
+
+    blank(); delay(500);
+
+    // ── Raw LED 0 direct (no mapping at all): tells us where the chain STARTS
+    leds[0] = CRGB::Green;
     FastLED.show();
-    delay(500);
+    step("RAW leds[0] GREEN — physical LED 0; note which corner it lights", 3000);
 
-    // --- Phase A: Raw fill_solid (no custom mapping at all) ---
-    // Every LED gets the same color regardless of addressing.
-    // Use this to confirm FastLED, pin, and color-order are all correct.
-    Serial.println("Phase A: fill_solid RED (raw, no mapping)");
-    fill_solid(leds, NUM_LEDS, CRGB::Red);
+    blank(); delay(500);
+
+    // ── Raw LEDs 0-15: shows the first serpentine band direction
+    for(int i=0;i<16;i++) leds[i]=CRGB(255,50,0); // orange
     FastLED.show();
-    delay(2000);
+    step("RAW leds[0..15] ORANGE — first 16 LEDs; row or column? which end?", 3000);
 
-    Serial.println("Phase A: fill_solid GREEN");
-    fill_solid(leds, NUM_LEDS, CRGB::Green);
-    FastLED.show();
-    delay(2000);
+    blank(); delay(500);
 
-    Serial.println("Phase A: fill_solid BLUE");
-    fill_solid(leds, NUM_LEDS, CRGB::Blue);
-    FastLED.show();
-    delay(2000);
-
-    FastLED.clear(); FastLED.show();
-    delay(500);
-
-    // --- Phase B: setPixel_Final loop (legacy mapping) ---
-    // Should look identical to Phase A for solid fills.
-    // If it doesn't, the legacy mapping has a bug (unlikely given it passed hardware tests).
-    Serial.println("Phase B: legacyFill RED (via setPixel_Final)");
-    legacyFill(CRGB::Red);
-    delay(2000);
-
-    Serial.println("Phase B: legacyFill GREEN");
-    legacyFill(CRGB::Green);
-    delay(2000);
-
-    Serial.println("Phase B: legacyFill BLUE");
-    legacyFill(CRGB::Blue);
-    delay(2000);
-
-    FastLED.clear(); FastLED.show();
-    delay(500);
-
-    Serial.println("=== Setup complete, entering loop ===");
+    Serial.println("\n=== DIAGNOSTIC COMPLETE — entering loop (row scan) ===");
 }
 
 void loop() {
-    // Cycle: A-raw then B-legacy, forever
-    static uint8_t phase = 0;
-    static const CRGB colors[] = { CRGB::Red, CRGB::Green, CRGB::Blue };
-    static const char* colorNames[] = { "RED", "GREEN", "BLUE" };
-    uint8_t c = phase % 3;
-    bool useRaw = phase < 3;
-
-    if (useRaw) {
-        Serial.printf("A-raw %s\n", colorNames[c]);
-        fill_solid(leds, NUM_LEDS, colors[c]);
-        FastLED.show();
-    } else {
-        Serial.printf("B-legacy %s\n", colorNames[c]);
-        legacyFill(colors[c]);
+    // Slowly scan rows top→bottom so you can see the direction
+    for (uint8_t r = 0; r < 16; r++) {
+        showRow(r, CRGB::White);
+        Serial.printf("Row %u\n", r);
+        delay(400);
     }
-    phase = (phase + 1) % 6;
-    delay(2000);
+    blank();
+    delay(500);
 }
