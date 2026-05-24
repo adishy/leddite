@@ -1,6 +1,7 @@
 import asyncio
 import websockets
 import struct
+import json
 
 class LedditeClient:
     FONT = {
@@ -71,7 +72,57 @@ class LedditeClient:
                         px, py = char_idx * 6 + col_idx, row_idx
                         idx = (py * w_total + px) * 3
                         pixels[idx:idx+3] = color
-        
+
         flags = 2 # Show
         if marquee: flags |= 4
         await self.send_sprite(w_total, h_total, x, y, rotation, flags, pixels=pixels)
+
+    # ── Encoder event support ─────────────────────────────────────────────────
+    # The ESP32 sends JSON TEXT frames when the encoder is turned/pressed
+    # while in Network Canvas mode:
+    #   {"type": "encoder", "delta": 1}          clockwise turn
+    #   {"type": "encoder", "delta": -1}         counter-clockwise turn
+    #   {"type": "encoder", "button": "pressed"} short press
+    #   {"type": "encoder", "button": "released"} release after long press
+    #
+    # Binary (sprite) frames continue to work as before.
+
+    async def receive_loop(self, on_sprite_data=None, on_encoder_event=None):
+        """Unified receive loop handling both binary sprite frames and JSON encoder events.
+
+        Args:
+            on_sprite_data: async callable(bytes) — called for each binary sprite frame
+            on_encoder_event: async callable(dict) — called for each encoder JSON event
+        """
+        async for message in self.ws:
+            if isinstance(message, bytes):
+                if on_sprite_data:
+                    await on_sprite_data(message)
+            elif isinstance(message, str):
+                if on_encoder_event:
+                    try:
+                        event = json.loads(message)
+                        if event.get("type") == "encoder":
+                            await on_encoder_event(event)
+                    except json.JSONDecodeError:
+                        pass  # ignore non-JSON text frames
+
+    async def listen_encoder(self, callback):
+        """Connect and listen only for encoder events.
+
+        Args:
+            callback: async callable(dict) — receives encoder event dicts.
+                      dict keys: 'type', 'delta' (int), or 'button' (str)
+
+        Example:
+            async def on_event(ev):
+                if 'delta' in ev:
+                    print(f"Encoder turned: {ev['delta']}")
+                elif ev.get('button') == 'pressed':
+                    print("Encoder pressed!")
+
+            client = LedditeClient('192.168.1.100', 81)
+            await client.connect()
+            await client.listen_encoder(on_event)
+        """
+        await self.receive_loop(on_encoder_event=callback)

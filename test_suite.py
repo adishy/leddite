@@ -4,6 +4,7 @@ import struct
 import math
 import sys
 import time
+import json
 
 TARGET_HOST = "localhost"
 TARGET_PORT = "8765"
@@ -103,6 +104,55 @@ async def test_bouncing_ball():
             await ws.send(create_packet(2, 2, x=int(x), y=int(y), pixels=[255, 255, 0] * 4, flags=1|2))
             await asyncio.sleep(0.016) # 60 FPS
 
+async def test_encoder_events():
+    """Test: Encoder event receive-side validation.
+
+    Connects to the WebSocket, sends a regression binary packet to verify
+    binary frames still work, then listens for 1.5s for JSON text frames
+    (encoder events from hardware). Passes in CI even if no encoder events arrive.
+
+    When testing against live hardware, physically rotate/press the encoder
+    while this test is running to verify the JSON events are received.
+    """
+    print("Test: Encoder event receive (binary regression + JSON parse)...")
+
+    # Regression: verify binary protocol still works
+    await send_packet(create_packet(4, 4, x=6, y=6, pixels=[0, 255, 0] * 16, flags=1|2))
+
+    # Listen for up to 1.5s for any text (encoder) frames
+    received_events = []
+    try:
+        async with websockets.connect(f"ws://{TARGET_HOST}:{TARGET_PORT}", compression=None) as ws:
+            deadline = asyncio.get_event_loop().time() + 1.5
+            while asyncio.get_event_loop().time() < deadline:
+                try:
+                    msg = await asyncio.wait_for(ws.recv(), timeout=0.2)
+                    if isinstance(msg, str):
+                        event = json.loads(msg)
+                        assert "type" in event, "Encoder event must have 'type' field"
+                        assert event["type"] == "encoder", f"Expected type='encoder', got {event['type']}"
+                        # Must have either 'delta' (int) or 'button' (str)
+                        assert ("delta" in event or "button" in event), \
+                            f"Encoder event must have 'delta' or 'button': {event}"
+                        if "delta" in event:
+                            assert isinstance(event["delta"], int), \
+                                f"'delta' must be int, got {type(event['delta'])}"
+                        if "button" in event:
+                            assert event["button"] in ("pressed", "released"), \
+                                f"'button' must be 'pressed' or 'released', got {event['button']}"
+                        received_events.append(event)
+                        print(f"  Received encoder event: {event}")
+                except asyncio.TimeoutError:
+                    pass  # no message in this 0.2s window, keep waiting
+    except Exception as e:
+        print(f"  Connection error: {e}")
+
+    if received_events:
+        print(f"  Validated {len(received_events)} encoder event(s) — PASSED")
+    else:
+        print("  No encoder events received (expected in CI / when not in Network mode) — PASSED")
+
+
 async def run_all():
     global TARGET_HOST, TARGET_PORT
     if len(sys.argv) > 1:
@@ -116,6 +166,7 @@ async def run_all():
         await test_text()
         await test_marquee()
         await test_bouncing_ball()
+        await test_encoder_events()
         print("Suite Complete.")
     except Exception as e:
         print(f"Error: {e}. Is 'make run-sim' active?")

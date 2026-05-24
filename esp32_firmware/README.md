@@ -26,6 +26,7 @@ alias arduino-cli="/Applications/Arduino IDE.app/Contents/Resources/app/lib/back
 Required Arduino libraries (install once via Arduino IDE Library Manager or `arduino-cli lib install`):
 - **FastLED** — LED driving
 - **WebSockets** (arduinoWebSockets by Links2004) — WebSocket server
+- **ESP32Encoder** (madhephaestus) — rotary encoder driver (`arduino-cli lib install "ESP32Encoder"`)
 
 Board package: **esp32** by Espressif (install via Board Manager).
 
@@ -76,15 +77,32 @@ Flash:
 On boot the firmware:
 1. Initialises FastLED (panel goes dark).
 2. Connects to WiFi — prints dots to serial at 115200 baud.
-3. **Flashes the entire display solid green for 500 ms** once connected.
-4. Prints the IP and WebSocket URL to serial, e.g.:
-   ```
-   IP: 192.168.0.128
-   WebSocket server on ws://192.168.0.128:81
-   Run: python test_suite.py 192.168.0.128 81
-   ```
+3. Syncs NTP time (Eastern Time, auto-DST).
+4. **Flashes the entire display solid green for 500 ms** once ready.
+5. Shows the **boot menu** on the LED panel — rotate encoder to select:
+   - `CK` — Clock + Calendar (NTP time / scrolling date)
+   - `NT` — Network Canvas (WebSocket binary protocol, port 81)
+   - `PT` — Pattern Slideshow (rainbow, lava lamp, pulse, sparkle)
+   - `TM` — Visual Timer (rotary encoder sets minutes)
+6. Press encoder to enter selected mode. Press again to return to menu.
+   In Network Canvas mode: long-press (2s) to return to menu.
 
-Monitor serial with any 115200-baud terminal (e.g. `screen /dev/cu.usbserial-0001 115200`).
+Serial output at 115200 baud shows IP, mode transitions, and encoder events.
+
+### Rotary Encoder
+- **CLK** → GPIO 32  |  **DT** → GPIO 33  |  **Button** → GPIO 25
+- Turn: navigate menu / adjust timer / skip pattern
+- Short press: select / confirm / back to menu
+- Long press (2s): back to menu (Network Canvas mode only)
+
+### Network Canvas Encoder Events
+While in Network Canvas mode, encoder input is broadcast as JSON TEXT frames:
+```json
+{"type":"encoder","delta":1}          // clockwise
+{"type":"encoder","delta":-1}         // counter-clockwise
+{"type":"encoder","button":"pressed"} // short press
+```
+Receive with `leddite_client.py`: `await client.listen_encoder(my_callback)`
 
 ---
 
