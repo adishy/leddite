@@ -2,7 +2,11 @@ import asyncio
 import websockets
 import struct
 import math
+import sys
 import time
+
+TARGET_HOST = "localhost"
+TARGET_PORT = "8765"
 
 # --- 5x7 Font Data (0-9, A-Z, Space, !, ?) ---
 FONT = {
@@ -44,13 +48,13 @@ def render_text(text, color=(255, 255, 255)):
     return width, height, pixels
 
 # --- Protocol Helpers ---
-def create_packet(width, height, x=0, y=0, rotation=0, flags=0, brightness=255, pixels=None):
+def create_packet(width, height, x=0, y=0, rotation=0, flags=0, brightness=64, pixels=None):
     header = struct.pack('BBBBbbBB', 1, flags, width, height, x, y, rotation, brightness)
     if pixels is None: pixels = [255, 255, 255] * (width * height)
     return header + bytes(pixels)
 
 async def send_packet(packet):
-    async with websockets.connect("ws://localhost:8765") as ws:
+    async with websockets.connect(f"ws://{TARGET_HOST}:{TARGET_PORT}", compression=None) as ws:
         await ws.send(packet)
 
 # --- Test Programs ---
@@ -71,7 +75,7 @@ async def test_shapes():
 async def test_text():
     print("Test: Text (Static & Rotated)...")
     # Static HI
-    w, h, pixels = render_text("HI", color=(0, 255, 0))
+    w, h, pixels = render_text("HI", color=(255, 0, 0))
     await send_packet(create_packet(w, h, x=2, y=4, pixels=pixels, flags=1|2))
     await asyncio.sleep(1.5)
 
@@ -91,7 +95,7 @@ async def test_marquee():
 async def test_bouncing_ball():
     print("Test: Bouncing Ball (60 FPS Bridge Test)...")
     x, y, dx, dy = 8, 8, 0.8, 0.6
-    async with websockets.connect("ws://localhost:8765") as ws:
+    async with websockets.connect(f"ws://{TARGET_HOST}:{TARGET_PORT}", compression=None) as ws:
         for _ in range(120):
             x, y = x + dx, y + dy
             if x <= 0 or x >= 14: dx *= -1
@@ -100,7 +104,13 @@ async def test_bouncing_ball():
             await asyncio.sleep(0.016) # 60 FPS
 
 async def run_all():
-    print("Starting Comprehensive Leddite V2 Suite...")
+    global TARGET_HOST, TARGET_PORT
+    if len(sys.argv) > 1:
+        TARGET_HOST = sys.argv[1] if sys.argv[1] else TARGET_HOST
+        TARGET_PORT = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] else TARGET_PORT
+
+    host = f"{TARGET_HOST}:{TARGET_PORT}"
+    print(f"Starting Comprehensive Leddite V2 Suite to ({host})...")
     try:
         await test_shapes()
         await test_text()
@@ -112,3 +122,4 @@ async def run_all():
 
 if __name__ == "__main__":
     asyncio.run(run_all())
+
