@@ -142,6 +142,16 @@ async def _safe_send(client, message):
 
 
 # ── WebSocket handler ─────────────────────────────────────────────────────────
+CANVAS_ACK_MAGIC = 0xCA
+FLAG_ACK_CANVAS  = 0x08
+
+
+def _build_canvas_ack() -> bytes:
+    """Build the 771-byte canvas readback response from the current mirror state."""
+    with _canvas_lock:
+        return bytes([CANVAS_ACK_MAGIC, CANVAS_W, CANVAS_H]) + bytes(_canvas)
+
+
 async def register(websocket):
     async with CLIENTS_LOCK:
         CLIENTS.add(websocket)
@@ -152,6 +162,12 @@ async def register(websocket):
             if isinstance(message, bytes):
                 _process_packet(message)
                 print(f"[WS] Binary {len(message)}B from #{client_id}")
+                # FLAG_ACK_CANVAS (0x08): reply to requester with current canvas state.
+                # Mirrors ESP32 NetworkMode::sendCanvasAck — identical response format.
+                if len(message) >= 2 and (message[1] & FLAG_ACK_CANVAS):
+                    ack = _build_canvas_ack()
+                    await _safe_send(websocket, ack)
+                    print(f"[WS] Canvas ACK → #{client_id} ({len(ack)}B)")
             else:
                 try:
                     ev = json.loads(message)

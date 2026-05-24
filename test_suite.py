@@ -31,10 +31,12 @@ import urllib.request
 import websockets
 
 # ── CLI config ────────────────────────────────────────────────────────────────
-TARGET_HOST  = "localhost"
-TARGET_PORT  = "8765"
-VERIFY_MODE  = False   # --verify: pause between tests for visual inspection
-CANVAS_API   = "http://localhost:8000/canvas-state"  # simulator only
+TARGET_HOST      = "localhost"
+TARGET_PORT      = "8765"
+VERIFY_MODE      = False   # --verify: pause between tests for visual inspection
+CANVAS_API       = "http://localhost:8000/canvas-state"  # simulator HTTP fallback
+CANVAS_ACK_MAGIC = 0xCA    # first byte of canvas readback response
+FLAG_ACK_CANVAS  = 0x08    # protocol flag: request canvas readback after render
 
 # ── 5×7 Font ──────────────────────────────────────────────────────────────────
 FONT = {
@@ -92,6 +94,58 @@ async def send_packet(packet, keep_open_ms=0):
                 await asyncio.sleep(keep_open_ms / 1000)
     except Exception as e:
         raise RuntimeError(f"send_packet failed ({uri}): {e}") from e
+
+
+async def send_and_read_canvas(packet, timeout=3.0):
+    """Send a packet with FLAG_ACK_CANVAS set; return the canvas state dict.
+
+    Works on both simulator (port 8765) and hardware (port 81).  The receiver
+    immediately sends back a 771-byte response: [0xCA, 16, 16, r,g,b×256].
+
+    Args:
+        packet: raw bytes of the packet to send (FLAG_ACK_CANVAS will be OR'd in)
+        timeout: seconds to wait for the response
+
+    Returns:
+        {"width": 16, "height": 16, "pixels": [[r,g,b], ...]}
+
+    Raises:
+        RuntimeError if no response arrives within timeout
+    """
+    # Stamp FLAG_ACK_CANVAS into flags byte (index 1)
+    pkt = bytearray(packet)
+    pkt[1] |= FLAG_ACK_CANVAS
+
+    uri = f"ws://{TARGET_HOST}:{TARGET_PORT}"
+    try:
+        async with websockets.connect(uri, compression=None) as ws:
+            await ws.send(bytes(pkt))
+            deadline = asyncio.get_event_loop().time() + timeout
+            while asyncio.get_event_loop().time() < deadline:
+                remaining = deadline - asyncio.get_event_loop().time()
+                try:
+                    msg = await asyncio.wait_for(ws.recv(), timeout=min(remaining, 0.5))
+                    if (isinstance(msg, bytes)
+                            and len(msg) >= 3
+                            and msg[0] == CANVAS_ACK_MAGIC):
+                        w, h = msg[1], msg[2]
+                        expected = 3 + w * h * 3
+                        if len(msg) >= expected:
+                            pixels = [
+                                [msg[3 + i*3], msg[3 + i*3 + 1], msg[3 + i*3 + 2]]
+                                for i in range(w * h)
+                            ]
+                            return {"width": w, "height": h, "pixels": pixels}
+                except asyncio.TimeoutError:
+                    pass
+    except Exception as e:
+        raise RuntimeError(f"send_and_read_canvas failed ({uri}): {e}") from e
+
+    raise RuntimeError(
+        f"No canvas ACK received within {timeout}s from {uri}.\n"
+        "  Simulator: is simulator_server.py running?\n"
+        "  Hardware:  is ESP32 in Network Canvas mode?"
+    )
 
 
 # ── Canvas assertion helpers ──────────────────────────────────────────────────
@@ -200,26 +254,20 @@ async def test_shapes():
     print("  shapes… ", end="", flush=True)
 
     # Red 4×4 square at (2,2), clear first
-    await send_packet(create_packet(4, 4, x=2, y=2, pixels=[255, 0, 0] * 16, flags=0x01|0x02))
-    await asyncio.sleep(0.3)
+    state = await send_and_read_canvas(
+        create_packet(4, 4, x=2, y=2, pixels=[255, 0, 0] * 16, flags=0x01|0x02))
+    assert_region(state, 2, 2, 4, 4, [255, 0, 0], min_fraction=0.9, label="red square")
+    assert_pixel_black(state, 0, 0, label="outside square")
 
-    state = get_canvas_state()
-    if state:
-        assert_region(state, 2, 2, 4, 4, [255, 0, 0], min_fraction=0.9, label="red square")
-        assert_pixel_black(state, 0, 0, label="outside square")
-
-    # Blue circle (5×5) at (9,9), drawn on top
+    # Blue circle (5×5) at (9,9), drawn on top — no clear
     blue = []
     for sy in range(5):
         for sx in range(5):
             blue.extend([0, 0, 255] if math.sqrt((sx-2)**2 + (sy-2)**2) < 2.5 else [0, 0, 0])
-    await send_packet(create_packet(5, 5, x=9, y=9, pixels=blue, flags=0x02))
-    await asyncio.sleep(0.3)
-
-    state = get_canvas_state()
-    if state:
-        assert_pixel(state, 11, 11, [0, 0, 255], label="blue circle centre")
-        assert_pixel(state, 3,  3,  [255, 0, 0], label="red square still present")
+    state = await send_and_read_canvas(
+        create_packet(5, 5, x=9, y=9, pixels=blue, flags=0x02))
+    assert_pixel(state, 11, 11, [0, 0, 255], label="blue circle centre")
+    assert_pixel(state,  3,  3, [255, 0, 0], label="red square still present")
 
     verify_prompt("Shapes", "Red 4×4 square at top-left area; blue circle at bottom-right.")
     print("OK")
@@ -230,26 +278,18 @@ async def test_text():
 
     # "HI" in red, clear first
     w, h, px = render_text("HI", color=(255, 0, 0))
-    await send_packet(create_packet(w, h, x=2, y=4, pixels=px, flags=0x01|0x02))
-    await asyncio.sleep(0.3)
-
-    state = get_canvas_state()
-    if state:
-        assert_any_nonblack(state, label="HI text")
-        # The 'H' first column glyph (0x7F) — column 0 of 'H' is all 7 rows lit.
-        # At x=2 (sprite x=0 → canvas x=2), rows 0..6 → canvas y=4..10
-        assert_pixel_nonblack(state, 2, 4, label="H top-left pixel")
+    state = await send_and_read_canvas(create_packet(w, h, x=2, y=4, pixels=px, flags=0x01|0x02))
+    assert_any_nonblack(state, label="HI text")
+    # 'H' glyph first column (0x7F = all 7 rows lit) at sprite x=0 → canvas x=2, y=4..10
+    assert_pixel_nonblack(state, 2, 4, label="H top-left pixel")
 
     verify_prompt("Static text", "Red 'HI' text at approx (2,4).")
 
     # "LED" in blue, rotated 90°
     w, h, px = render_text("LED", color=(0, 100, 255))
-    await send_packet(create_packet(w, h, x=8, y=0, rotation=1, pixels=px, flags=0x01|0x02))
-    await asyncio.sleep(0.3)
-
-    state = get_canvas_state()
-    if state:
-        assert_any_nonblack(state, label="LED rotated text")
+    state = await send_and_read_canvas(
+        create_packet(w, h, x=8, y=0, rotation=1, pixels=px, flags=0x01|0x02))
+    assert_any_nonblack(state, label="LED rotated text")
 
     verify_prompt("Rotated text", "Blue 'LED' rotated 90° from top-right area.")
     print("OK")
@@ -309,13 +349,10 @@ async def test_bouncing_ball():
 async def test_encoder_events():
     print("  encoder…", end="", flush=True)
 
-    # Regression: binary protocol still works — draw green square
-    await send_packet(create_packet(4, 4, x=6, y=6, pixels=[0, 255, 0] * 16, flags=0x01|0x02))
-    await asyncio.sleep(0.2)
-
-    state = get_canvas_state()
-    if state:
-        assert_region(state, 6, 6, 4, 4, [0, 255, 0], label="encoder regression green square")
+    # Regression: binary protocol + canvas readback still work — draw green square
+    state = await send_and_read_canvas(
+        create_packet(4, 4, x=6, y=6, pixels=[0, 255, 0] * 16, flags=0x01|0x02))
+    assert_region(state, 6, 6, 4, 4, [0, 255, 0], label="encoder regression green square")
 
     # Listen 2s for JSON encoder events (hardware) or simulator button presses
     received = []
@@ -348,66 +385,62 @@ async def test_encoder_events():
 
 
 async def test_canvas_assertions():
-    """Standalone canvas assertion smoke test — simulator only.
+    """Pixel-level canvas verification — works on simulator AND real hardware.
 
-    Sends a known exact pattern and verifies every asserted pixel matches.
-    This is the primary test for agents: deterministic pass/fail with no
-    browser or vision required.
+    Uses FLAG_ACK_CANVAS (0x08): the receiver renders the packet then immediately
+    sends back the full 16×16 canvas buffer as a binary WS response.  No camera,
+    no browser, no vision model needed.  Same code path on both targets.
+
+    Sub-tests:
+      1. clear     — all 256 pixels black after a clear-only packet
+      2. fill      — 16×16 white fill covers every pixel
+      3. overlay   — 2×2 red dot without clear leaves surrounding pixels intact
+      4. rotation  — 3×1 horizontal blue bar at 90° appears as 1×3 vertical column
+      5. clipping  — sprite with negative x_offset clips correctly at left edge
     """
-    if not _using_simulator():
-        print("  canvas…  SKIP (hardware target — no canvas feedback)")
-        return
-
     print("  canvas…  ", end="", flush=True)
 
-    # 1. Clear
-    await send_packet(create_packet(1, 1, x=0, y=0, pixels=[0, 0, 0], flags=0x01|0x02))
-    await asyncio.sleep(0.1)
-    state = get_canvas_state()
-    for y in range(16):
-        for x in range(16):
-            assert_pixel_black(state, x, y, label="after clear")
+    # 1. Clear — send 1×1 black pixel with clear flag; assert all pixels black
+    state = await send_and_read_canvas(
+        create_packet(1, 1, x=0, y=0, pixels=[0, 0, 0], flags=0x01|0x02))
+    for cy in range(16):
+        for cx in range(16):
+            assert_pixel_black(state, cx, cy, label="after clear")
 
     # 2. Full 16×16 white fill
-    await send_packet(create_packet(16, 16, x=0, y=0,
-                                    pixels=[255, 255, 255] * 256, flags=0x01|0x02))
-    await asyncio.sleep(0.1)
-    state = get_canvas_state()
-    for y in range(16):
-        for x in range(16):
-            assert_pixel(state, x, y, [255, 255, 255], label="white fill")
+    state = await send_and_read_canvas(
+        create_packet(16, 16, x=0, y=0, pixels=[255, 255, 255] * 256, flags=0x01|0x02))
+    for cy in range(16):
+        for cx in range(16):
+            assert_pixel(state, cx, cy, [255, 255, 255], label="white fill")
 
-    # 3. Overlay a 2×2 red dot at (7,7) without clearing
-    await send_packet(create_packet(2, 2, x=7, y=7, pixels=[255, 0, 0] * 4, flags=0x02))
-    await asyncio.sleep(0.1)
-    state = get_canvas_state()
-    assert_pixel(state, 7,  7,  [255, 0, 0],     label="red dot")
-    assert_pixel(state, 8,  7,  [255, 0, 0],     label="red dot")
-    assert_pixel(state, 0,  0,  [255, 255, 255],  label="white background preserved")
-    assert_pixel(state, 15, 15, [255, 255, 255],  label="white background preserved corner")
+    # 3. Overlay: 2×2 red dot at (7,7) without clearing — background must survive
+    state = await send_and_read_canvas(
+        create_packet(2, 2, x=7, y=7, pixels=[255, 0, 0] * 4, flags=0x02))
+    assert_pixel(state,  7,  7, [255, 0, 0],    label="red dot")
+    assert_pixel(state,  8,  7, [255, 0, 0],    label="red dot")
+    assert_pixel(state,  0,  0, [255, 255, 255], label="white background preserved")
+    assert_pixel(state, 15, 15, [255, 255, 255], label="white background preserved corner")
 
-    # 4. 90° rotation: 3×1 horizontal bar → should appear as 1×3 vertical bar
-    # Sprite: 3 wide × 1 tall, all blue, placed at (4,4), rotated 90°
-    # After 90° rotation: w=1, h=3; tx=(h-1-y)=0, ty=x → pixels at canvas (4,4),(4,5),(4,6)
-    await send_packet(create_packet(3, 1, x=4, y=4, rotation=1,
-                                    pixels=[0, 0, 255] * 3, flags=0x01|0x02))
-    await asyncio.sleep(0.1)
-    state = get_canvas_state()
-    assert_pixel(state, 4, 4, [0, 0, 255], label="rotation 90° pixel 0")
-    assert_pixel(state, 4, 5, [0, 0, 255], label="rotation 90° pixel 1")
-    assert_pixel(state, 4, 6, [0, 0, 255], label="rotation 90° pixel 2")
-    assert_pixel_black(state, 5, 4, label="rotation 90° no overflow")
+    # 4. Rotation: 3×1 horizontal blue bar rotated 90° → must appear as 1×3 vertical column
+    # Transformer 90°: tx = h-1-sy = 0, ty = sx → pixels land at (4,4),(4,5),(4,6)
+    state = await send_and_read_canvas(
+        create_packet(3, 1, x=4, y=4, rotation=1, pixels=[0, 0, 255] * 3, flags=0x01|0x02))
+    assert_pixel(state, 4, 4, [0, 0, 255], label="rotation 90° row 0")
+    assert_pixel(state, 4, 5, [0, 0, 255], label="rotation 90° row 1")
+    assert_pixel(state, 4, 6, [0, 0, 255], label="rotation 90° row 2")
+    assert_pixel_black(state, 5, 4, label="rotation 90° no overflow right")
+    assert_pixel_black(state, 4, 3, label="rotation 90° no overflow up")
 
-    # 5. Negative x_offset clipping: 4×4 green at (-2, 0) — left 2 cols off-screen
-    await send_packet(create_packet(4, 4, x=-2, y=0, pixels=[0, 255, 0] * 16, flags=0x01|0x02))
-    await asyncio.sleep(0.1)
-    state = get_canvas_state()
-    assert_pixel(state, 0, 0, [0, 255, 0], label="clip left — col 0 visible")
-    assert_pixel(state, 1, 0, [0, 255, 0], label="clip left — col 1 visible")
-    assert_pixel_black(state, 4, 0, label="clip left — beyond sprite right edge")
+    # 5. Clipping: 4×4 green at x=-2 → left 2 columns are off-screen, right 2 visible
+    state = await send_and_read_canvas(
+        create_packet(4, 4, x=-2, y=0, pixels=[0, 255, 0] * 16, flags=0x01|0x02))
+    assert_pixel(state, 0, 0, [0, 255, 0], label="clip — col 0 visible")
+    assert_pixel(state, 1, 0, [0, 255, 0], label="clip — col 1 visible")
+    assert_pixel_black(state, 4, 0, label="clip — beyond sprite right edge")
 
     # Clean up
-    await send_packet(create_packet(1, 1, x=0, y=0, pixels=[0, 0, 0], flags=0x01|0x02))
+    await send_and_read_canvas(create_packet(1, 1, x=0, y=0, pixels=[0,0,0], flags=0x01|0x02))
 
     print("OK (5 sub-tests: clear, fill, overlay, rotation, clipping)")
 

@@ -42,7 +42,13 @@ public:
     // Last brightness from a packet (0 = use default) — read by main .ino
     uint8_t lastBrightness = DEFAULT_BRIGHTNESS;
 
+    // Canvas readback response magic byte
+    static const uint8_t CANVAS_ACK_MAGIC = 0xCA;
+
 private:
+    // Send current canvas buffer back to client num as a binary WS frame.
+    // Format: [0xCA, width=16, height=16, r,g,b × 256] = 771 bytes.
+    void sendCanvasAck(const Canvas& canvas, WebSocketsServer& ws, uint8_t num);
     uint8_t* marqueeBuf     = nullptr;
     size_t   marqueeBufSize = 0;
     uint32_t lastMarqueeMs  = 0;
