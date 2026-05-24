@@ -9,19 +9,46 @@
 <body>
     <div class="container">
         <h1>Leddite V2 Simulator</h1>
+
+        <!-- LED matrix -->
         <div id="matrix-container">
             <div id="led-grid" class="grid-16x16"></div>
         </div>
+
+        <!-- Status + clear -->
         <div class="controls">
-            <button id="clear-btn">Clear</button>
+            <button id="clear-btn" title="Clear display (C)">Clear</button>
             <div class="status">
                 Status: <span id="status-text">Disconnected</span>
             </div>
             <div class="info">
-                Last Sprite: <span id="sprite-info">None</span>
+                Last frame: <span id="sprite-info">—</span>
             </div>
         </div>
+
+        <!-- Rotary encoder simulator -->
+        <div class="encoder-section">
+            <div class="encoder-label">Rotary Encoder</div>
+            <div class="encoder-controls">
+                <button id="enc-ccw" class="enc-btn" title="Counter-clockwise (← key)">
+                    <span>↺</span><br><small>CCW</small>
+                </button>
+                <button id="enc-press" class="enc-btn enc-press-btn" title="Press encoder (Enter / Space)">
+                    <span>⏺</span><br><small>Press</small>
+                </button>
+                <button id="enc-cw" class="enc-btn" title="Clockwise (→ key)">
+                    <span>↻</span><br><small>CW</small>
+                </button>
+            </div>
+            <div class="encoder-hint">
+                Keyboard: <kbd>←</kbd> CCW &nbsp; <kbd>→</kbd> CW &nbsp;
+                <kbd>Enter</kbd>/<kbd>Space</kbd> Press &nbsp;
+                <kbd>L</kbd> Long-press (3 s)
+            </div>
+            <div id="encoder-log" class="encoder-log">encoder events will appear here</div>
+        </div>
     </div>
+
     <script src="leddite_wasm.js"></script>
     <script src="simulator.js"></script>
 </body>
