@@ -87,13 +87,13 @@ void TimeMode::showClock(Canvas& canvas) {
         canvas.drawSprite(buf, (uint8_t)w, (uint8_t)h, x, 1, 0, false);
     }
 
-    // ── Minutes row (y=9): same color ────────────────────────────────────────
+    // ── Minutes row (y=9): pink ──────────────────────────────────────────────
     char mBuf[3];
     if (gotTime) { snprintf(mBuf, sizeof(mBuf), "%02d", timeinfo.tm_min); }
     else         { mBuf[0] = '-'; mBuf[1] = '-'; mBuf[2] = '\0'; }
 
     {
-        const uint8_t color[3] = {80, 180, 255};  // same sky blue
+        const uint8_t color[3] = {255, 80, 160};  // pink
         uint8_t  buf[12 * 7 * 3] = {0};
         uint16_t w = 0, h = 0;
         TextRenderer::renderText(mBuf, buf, w, h, color);
