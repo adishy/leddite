@@ -18,12 +18,12 @@ const AppMode MenuMode::MODES[NUM_OPTIONS] = {
     AppMode::TIMER,
 };
 
-// Distinct accent color per mode
+// Distinct accent color per mode — warm palette
 const uint8_t MenuMode::COLORS[NUM_OPTIONS][3] = {
-    {  80, 180, 255},  // clock+cal:  sky blue
-    {  80, 255, 120},  // network:    mint green
-    { 255,  80, 200},  // pattern:    hot magenta
-    { 255, 200,  60},  // timer:      warm amber
+    { 255, 200,  80},  // clock+cal:  golden amber
+    { 255, 130,  40},  // network:    warm orange
+    { 255,  90,  90},  // pattern:    warm rose/coral
+    { 255, 230, 100},  // timer:      warm yellow
 };
 
 // 4 dots across 16px: x = 3, 6, 9, 12

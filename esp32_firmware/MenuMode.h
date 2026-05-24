@@ -25,7 +25,7 @@
 class MenuMode {
 public:
     static const uint8_t  NUM_OPTIONS    = 4;
-    static const uint16_t MARQUEE_SPEED  = 40;  // px/sec — fast enough to read, slow enough to enjoy
+    static const uint16_t MARQUEE_SPEED  = 18;  // px/sec — comfortable reading pace
 
     void begin(Canvas& canvas);
     void onEncoderTurn(int delta, Canvas& canvas);

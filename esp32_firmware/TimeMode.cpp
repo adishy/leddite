@@ -73,10 +73,10 @@ void TimeMode::showClock(Canvas& canvas) {
     struct tm timeinfo;
     bool gotTime = getLocalTime(&timeinfo);
 
-    // ── Hours row (y=1): 24-hour format, sky blue ────────────────────────────
+    // ── Hours row (y=1): 24-hour format ──────────────────────────────────────
     char hBuf[3];
-    if (gotTime) snprintf(hBuf, sizeof(hBuf), "%02d", timeinfo.tm_hour);
-    else         hBuf[0] = '-'; hBuf[1] = '-'; hBuf[2] = '\0';
+    if (gotTime) { snprintf(hBuf, sizeof(hBuf), "%02d", timeinfo.tm_hour); }
+    else         { hBuf[0] = '-'; hBuf[1] = '-'; hBuf[2] = '\0'; }
 
     {
         const uint8_t color[3] = {80, 180, 255};  // sky blue (matches clock dot)
@@ -89,8 +89,8 @@ void TimeMode::showClock(Canvas& canvas) {
 
     // ── Minutes row (y=9): same color ────────────────────────────────────────
     char mBuf[3];
-    if (gotTime) snprintf(mBuf, sizeof(mBuf), "%02d", timeinfo.tm_min);
-    else         mBuf[0] = '-'; mBuf[1] = '-'; mBuf[2] = '\0';
+    if (gotTime) { snprintf(mBuf, sizeof(mBuf), "%02d", timeinfo.tm_min); }
+    else         { mBuf[0] = '-'; mBuf[1] = '-'; mBuf[2] = '\0'; }
 
     {
         const uint8_t color[3] = {80, 180, 255};  // same sky blue
