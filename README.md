@@ -24,10 +24,11 @@ press to select.
 
 | Mode | Label | Description |
 |------|-------|-------------|
-| Clock + Calendar | **CK** | 24-hour clock (HH blue, MM pink); alternates with scrolling date every 5 s |
+| Clock + Calendar | **CK** | 24-hour clock (HH sky-blue / MM pink); DVD-bounces around screen once/sec; alternates with date (DD orange / MMM green) every 10 s |
 | Network Canvas | **NT** | WebSocket binary API (port 81); encoder events broadcast as JSON |
 | Pattern Slideshow | **PT** | Rainbow wave, lava lamp, pulse, sparkle; auto-advance 15 s |
 | Visual Timer | **TM** | Encoder sets minutes (1–90), progress-bar countdown |
+| Characters | **OC** | Animated Pac-Man ghost; press cycles 5 colour palettes |
 
 **Universal gestures**
 - Long press (3 s) → back to boot menu from any mode
@@ -139,7 +140,7 @@ make test
 
 ```
 esp32_firmware/       Production ESP32 sketch + all mode modules
-  AppState.h            AppMode enum (MENU, CLOCK_CAL, NETWORK, PATTERN, TIMER, OFF)
+  AppState.h            AppMode enum (MENU, CLOCK_CAL, NETWORK, PATTERN, TIMER, OCTOPUS, OFF)
   EncoderInput.*        Rotary encoder driver (CLK/DT/button, long-press detection)
   MenuMode.*            Boot menu (scrolling name, indicator dots, warm color palette)
   TimeMode.*            Clock + Calendar mode

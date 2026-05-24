@@ -7,19 +7,15 @@
 
 // TimeMode — Clock + Calendar display with DVD screensaver bounce.
 //
-// CLOCK view:  HH (blue) over MM (pink), 12×15 px block.
-//              Block bounces 1 px/sec around the 16×16 canvas (MAX_X=4, MAX_Y=1).
+// CLOCK view:    HH (sky-blue) over MM (pink), 12×15 px block.
+//                Block bounces 1 px/sec (MAX_X=4, MAX_Y=1).
 //
-// CALENDAR view: DD (blue) over MM-number (pink), same bounce logic.
+// CALENDAR view: DD (orange) over MMM-abbr (green), 18×15 px block.
+//                Month shown as 3-char abbreviation (JAN..DEC).
+//                18px > 16px canvas → x is pinned to 0, only vertical bounce.
 //
 // Auto-switches every SWITCH_INTERVAL_MS (10 s).
 // Short press (from .ino): toggleDisplay() skips to the other view immediately.
-//
-// Geometry:
-//   FACE_W = textWidth("HH") = 12 px
-//   FACE_H = 7 + 1 gap + 7   = 15 px
-//   MAX_X  = 16 - 12          = 4
-//   MAX_Y  = 16 - 15          = 1
 //
 // Call begin() on mode entry; update() every loop iteration.
 // Caller must call marquee.stop() before switching away (kept for API compat).
@@ -32,10 +28,10 @@ public:
     void toggleDisplay(Canvas& canvas, MarqueeEngine& marquee);
 
 private:
-    static const uint8_t FACE_W = 12;  // textWidth("HH")
-    static const uint8_t FACE_H = 15;  // 7 + 1 + 7
-    static const uint8_t MAX_X  = 4;   // 16 - FACE_W
-    static const uint8_t MAX_Y  = 1;   // 16 - FACE_H
+    static const uint8_t CLOCK_MAX_X = 4;   // clock (12px): 0..4, always fully on-screen
+    static const int8_t  CAL_MIN_X   = -2;  // cal (18px): goes off left edge a little
+    static const int8_t  CAL_MAX_X   =  2;  // cal (18px): goes off right edge a little
+    static const uint8_t MAX_Y       = 1;   // 16 - 15
 
     void showFace(Canvas& canvas);  // render current view at dvdX/dvdY
 
@@ -49,6 +45,6 @@ private:
     int8_t dvdDX = 1;
     int8_t dvdDY = 1;
 
-    // Reusable row render buffer — fits one 2-char row (12×7×3 = 252 bytes)
-    uint8_t faceBuf[12 * 7 * 3];
+    // Reusable row render buffer — fits one 3-char row (18×7×3 = 378 bytes)
+    uint8_t faceBuf[18 * 7 * 3];
 };

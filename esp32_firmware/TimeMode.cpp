@@ -42,13 +42,18 @@ void TimeMode::update(Canvas& canvas, MarqueeEngine& marquee) {
     if (nowSec == lastDrawSec) return;   // same second — nothing to do
     lastDrawSec = nowSec;
 
-    // Advance DVD position
+    // Advance DVD position — both views bounce X and Y.
+    // Clock (12px) stays fully on-screen (0..CLOCK_MAX_X).
+    // Calendar (18px) swings ±2 off each edge so both J and N get briefly clipped.
     dvdX += dvdDX;
+    if (showingClock) {
+        if (dvdX <= 0)          { dvdX = 0;           dvdDX =  1; }
+        if (dvdX >= CLOCK_MAX_X){ dvdX = CLOCK_MAX_X; dvdDX = -1; }
+    } else {
+        if (dvdX <= CAL_MIN_X)  { dvdX = CAL_MIN_X;   dvdDX =  1; }
+        if (dvdX >= CAL_MAX_X)  { dvdX = CAL_MAX_X;   dvdDX = -1; }
+    }
     dvdY += dvdDY;
-
-    // Bounce off walls
-    if (dvdX <= 0)    { dvdX = 0;    dvdDX =  1; }
-    if (dvdX >= MAX_X){ dvdX = MAX_X; dvdDX = -1; }
     if (dvdY <= 0)    { dvdY = 0;    dvdDY =  1; }
     if (dvdY >= MAX_Y){ dvdY = MAX_Y; dvdDY = -1; }
 
@@ -60,41 +65,53 @@ void TimeMode::update(Canvas& canvas, MarqueeEngine& marquee) {
 void TimeMode::showFace(Canvas& canvas) {
     canvas.clear();
 
+    static const char* const MONTH_ABBR[12] = {
+        "JAN","FEB","MAR","APR","MAY","JUN",
+        "JUL","AUG","SEP","OCT","NOV","DEC"
+    };
+
     struct tm timeinfo;
     bool gotTime = (time(nullptr) >= 1000000000UL) && getLocalTime(&timeinfo);
 
-    char topBuf[3], botBuf[3];
+    char topBuf[3], botBuf[4];  // botBuf needs 4 bytes for 3-char abbr + null
+
+    uint8_t topColor[3], botColor[3];
 
     if (showingClock) {
-        // Top row: HH  (sky blue)
-        if (gotTime) snprintf(topBuf, 3, "%02d", timeinfo.tm_hour);
+        // Clock: HH (sky-blue) / MM (pink)
+        if (gotTime) snprintf(topBuf, sizeof(topBuf), "%02d", timeinfo.tm_hour);
         else         { topBuf[0]='-'; topBuf[1]='-'; topBuf[2]='\0'; }
 
-        // Bottom row: MM  (pink)
-        if (gotTime) snprintf(botBuf, 3, "%02d", timeinfo.tm_min);
+        if (gotTime) snprintf(botBuf, sizeof(botBuf), "%02d", timeinfo.tm_min);
         else         { botBuf[0]='-'; botBuf[1]='-'; botBuf[2]='\0'; }
+
+        topColor[0]= 80; topColor[1]=180; topColor[2]=255;  // sky-blue
+        botColor[0]=255; botColor[1]= 80; botColor[2]=160;  // pink
     } else {
-        // Top row: DD  (sky blue)
-        if (gotTime) snprintf(topBuf, 3, "%02d", timeinfo.tm_mday);
+        // Calendar: DD (orange) / MMM-abbr (green)
+        if (gotTime) snprintf(topBuf, sizeof(topBuf), "%02d", timeinfo.tm_mday);
         else         { topBuf[0]='-'; topBuf[1]='-'; topBuf[2]='\0'; }
 
-        // Bottom row: month number 01-12  (pink)
-        if (gotTime) snprintf(botBuf, 3, "%02d", timeinfo.tm_mon + 1);
-        else         { botBuf[0]='-'; botBuf[1]='-'; botBuf[2]='\0'; }
-    }
+        if (gotTime) {
+            int m = timeinfo.tm_mon;  // 0-based
+            snprintf(botBuf, sizeof(botBuf), "%s", MONTH_ABBR[m < 0 ? 0 : m > 11 ? 11 : m]);
+        } else {
+            botBuf[0]='-'; botBuf[1]='-'; botBuf[2]='-'; botBuf[3]='\0';
+        }
 
-    const uint8_t BLUE[3] = {80, 180, 255};
-    const uint8_t PINK[3] = {255, 80, 160};
+        topColor[0]=255; topColor[1]=160; topColor[2]= 50;  // warm orange
+        botColor[0]= 80; botColor[1]=220; botColor[2]=120;  // soft green
+    }
 
     uint16_t w = 0, h = 0;
 
     // Top row at dvdY
     memset(faceBuf, 0, sizeof(faceBuf));
-    TextRenderer::renderText(topBuf, faceBuf, w, h, BLUE);
+    TextRenderer::renderText(topBuf, faceBuf, w, h, topColor);
     canvas.drawSprite(faceBuf, (uint8_t)w, (uint8_t)h, dvdX, dvdY, 0, false);
 
     // Bottom row at dvdY + 8  (7px glyph + 1px gap)
     memset(faceBuf, 0, sizeof(faceBuf));
-    TextRenderer::renderText(botBuf, faceBuf, w, h, PINK);
+    TextRenderer::renderText(botBuf, faceBuf, w, h, botColor);
     canvas.drawSprite(faceBuf, (uint8_t)w, (uint8_t)h, dvdX, (int8_t)(dvdY + 8), 0, false);
 }
