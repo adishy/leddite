@@ -9,10 +9,10 @@
 // or immediately on encoder turn via nextPattern().
 //
 // Patterns:
-//   0: Zoom Cube   — infinite square-tunnel zooming toward viewer (early-2000s OS vibe)
-//   1: Spin Pyramid — rotating wireframe pyramid, isometric projection
-//   2: Sparkle      — random twinkling pixels on dark background (unchanged)
-//   3: Orb Chase    — two colour orbs orbiting at different speeds (circles chasing circles)
+//   0: Spinning Cube — wireframe cube: H-spin → V-spin → zoom, colour changes every 9 s
+//   1: Spiral        — single-arm outwardly-growing Archimedean spiral, colour gradient
+//   2: Sparkle       — random twinkling pixels on dark background
+//   3: Orb Chase     — two colour orbs orbiting at different speeds
 //
 // All patterns render at ~30 FPS (gated by lastFrameMs).
 // pixBuf is a member to avoid 768-byte stack allocation in each draw call.
@@ -27,10 +27,10 @@ public:
     void nextPattern();            // advance immediately (encoder turn or press)
 
 private:
-    void drawZoomCube();     // 0: infinite square tunnel
-    void drawSpinPyramid();  // 1: rotating wireframe pyramid
-    void drawSparkle();      // 2: twinkling pixels
-    void drawOrbChase();     // 3: two orbiting colour blobs
+    void drawSpinningCube();  // 0: wireframe cube (H-spin → V-spin → zoom)
+    void drawSpiral();        // 1: single-arm outwardly-growing Archimedean spiral
+    void drawSparkle();       // 2: twinkling pixels
+    void drawOrbChase();      // 3: two orbiting colour blobs
 
     // Bresenham line into pixBuf (clips to 16×16)
     static void drawLine(uint8_t* buf,
