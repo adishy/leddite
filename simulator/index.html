@@ -49,6 +49,9 @@
         </div>
     </div>
 
+    <!-- Pre-declare Module before the Emscripten glue so onRuntimeInitialized
+         is guaranteed to be set before the WASM initialises (Emscripten 3.x). -->
+    <script>var Module = {};</script>
     <script src="leddite_wasm.js"></script>
     <script src="simulator.js"></script>
 </body>
