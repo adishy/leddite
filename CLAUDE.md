@@ -16,17 +16,22 @@ Leddite V2 is a 16×16 WS2812B LED matrix driven by an ESP32, with a binary WebS
 ### Python environment
 
 ```bash
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
+uv venv && uv pip install -r requirements.txt   # preferred
+# or: python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ```
 
 ### C++ unit tests (no Arduino/hardware needed)
 
 ```bash
-make test                        # build + run all 4 test binaries
+make test                        # build + run all 10 test binaries
+make test-wasm                   # drive the committed WASM DeviceUI under node
+make check-artifacts             # fail if a compiled binary is tracked (RULES.md)
 make test-text-renderer          # single test binary
 ./test/test_canvas               # run one already-built binary
 ```
+
+Test binaries are gitignored build artifacts — see `RULES.md` §1. They were once
+committed as macOS builds and broke `make test` on Linux.
 
 ### Simulator (browser-based, WASM)
 
@@ -39,6 +44,12 @@ make run-sim                           # rebuild WASM then start server
 ```
 
 **Must rebuild WASM after any change to `src/`, `include/`, or `simulator/wasm_bridge.cpp`**, then commit the new `simulator/leddite_wasm.js` + `simulator/leddite_wasm.wasm`. Run `make check-wasm` to verify a committed WASM is valid without rebuilding.
+
+The simulator has two render modes. **Network** draws frames arriving over the
+WebSocket protocol. **Device UI** runs the real firmware state machine
+(`src/UiController`) compiled to WASM, so the games, submenus, brightness editor
+and weather view in the browser are the same code the ESP32 executes — not a
+JS reimplementation. See `docs/adr/0002`.
 
 ### E2E test suite
 
@@ -62,23 +73,38 @@ make run-sim                           # rebuild WASM then start server
 /work-setup                # verify environment
 ```
 
-### ESP32 firmware (macOS, Arduino IDE 2.x)
+### ESP32 firmware
+
+Requires `arduino-cli`, the `esp32:esp32` core, and four libraries:
 
 ```bash
-# Compile
-"/Applications/Arduino IDE.app/Contents/Resources/app/lib/backend/resources/arduino-cli" \
-  compile -b esp32:esp32:esp32 esp32_firmware/esp32_firmware.ino
-
-# Flash (adjust port)
-"/Applications/Arduino IDE.app/Contents/Resources/app/lib/backend/resources/arduino-cli" \
-  upload -p /dev/cu.usbserial-0001 -b esp32:esp32:esp32 esp32_firmware/esp32_firmware.ino
+arduino-cli core install esp32:esp32
+arduino-cli lib install FastLED WebSockets ESP32Encoder ArduinoJson
 ```
 
-WiFi credentials go in `esp32_firmware/wifi_credentials.h` (gitignored):
-```cpp
-#pragma once
-const char* WIFI_SSID     = "your-ssid";
-const char* WIFI_PASSWORD = "your-password";
+Keep the `esp32_firmware/` copies of the `src/` modules in step first, then build:
+
+```bash
+tools/sync-firmware-copies.sh                    # copy src/ + include/ -> esp32_firmware/
+tools/sync-firmware-copies.sh --check            # fail if any copy is stale
+
+arduino-cli compile -b esp32:esp32:esp32 esp32_firmware/esp32_firmware.ino
+arduino-cli upload -p /dev/ttyUSB0 -b esp32:esp32:esp32 esp32_firmware/esp32_firmware.ino
+```
+
+On macOS the port is `/dev/cu.usbserial-0001`, and `arduino-cli` ships inside
+Arduino IDE 2.x at
+`/Applications/Arduino IDE.app/Contents/Resources/app/lib/backend/resources/arduino-cli`.
+
+**Flash usage is at ~90%** of the default partition. The weather client's TLS
+stack is most of the increase. If a future change overflows it, build with
+`-b esp32:esp32:esp32:PartitionScheme=min_spiffs` for ~600 KB more app space.
+
+WiFi credentials go in `esp32_firmware/wifi_credentials.h` (gitignored). Generate
+it from `LEDDITE_SSID` / `LEDDITE_PASSWORD` without echoing the values:
+
+```bash
+tools/gen-wifi-credentials.sh [path-to-env-file]
 ```
 
 ## Architecture
@@ -89,10 +115,21 @@ The core rendering logic lives in **two places** that must stay in sync:
 
 | Layer | Location | Compiled with |
 |-------|----------|---------------|
-| ESP32 production | `esp32_firmware/Canvas.cpp`, `Transformer.cpp`, `MarqueeEngine.cpp`, `ProtocolHandler.cpp`, `TextRenderer.cpp` | arduino-cli (Arduino framework) |
+| ESP32 production | `esp32_firmware/*.cpp` (copies) | arduino-cli (Arduino framework) |
 | Native / WASM | `src/` (same filenames) + `include/` headers | `g++` (unit tests) / `emcc` (WASM) |
 
-When editing any of these core files, update **both** copies. The `src/` copies have no Arduino dependencies, making them unit-testable and WASM-compilable.
+Duplicated modules: `Canvas`, `Transformer`, `MarqueeEngine`, `ProtocolHandler`,
+`TextRenderer`, plus the mode-logic set — `ColorUtils`, `Draw`,
+`SmallTextRenderer`, `ListMenu`, `GameEngine`, `BrightnessModel`, `WeatherView`,
+`Places`, `UiController`.
+
+When editing any of these, update **both** copies — run
+`tools/sync-firmware-copies.sh` (and `--check` in CI) rather than copying by
+hand. The `src/` copies have no Arduino dependencies, making them unit-testable
+and WASM-compilable.
+
+**New mode logic must go in `src/`, not `esp32_firmware/`** — Arduino-free, with
+time and randomness injected. See `docs/adr/0001` for why, and `RULES.md` §3.
 
 ### Binary WebSocket protocol
 
@@ -130,11 +167,28 @@ The browser (`simulator/index.html` + `simulator.js`) renders via the WASM modul
 The main sketch (`esp32_firmware/esp32_firmware.ino`) is a mode dispatcher. Each mode is a self-contained class with `begin(canvas)` and `update(canvas)` (and mode-specific `onEncoderTurn`/`onEncoderPress`):
 
 - **MenuMode** — boot menu; encoder navigates, press returns `AppMode` enum
-- **TimeMode** — NTP clock (Eastern Time) + scrolling date marquee, DVD-bounces around screen
+- **TimeMode** — NTP clock (Eastern Time), date, and current weather; cycles every 10 s, DVD-bounces around screen (the weather face is static)
 - **PatternMode** — four patterns (zoom cube tunnel, spinning wireframe pyramid, sparkle, orbiting colour blobs), auto-advance 15s; demo via `demo_3d_patterns.py`
 - **TimerMode** — encoder sets minutes 1–90, progress-bar countdown
 - **NetworkMode** — WebSocket server; relays binary packets to `Canvas`, broadcasts encoder JSON
 - **OctopusMode** — animated character (Pac-Man ghost); encoder cycles 5 colour palettes
+- **UiMode** — thin Arduino shell around `src/UiController`, which owns the Games
+  and Settings submenu trees. Supplies `millis()`, pushes the rendered buffer to
+  `Canvas`, and mirrors brightness/place/unit into NVS via `Preferences`.
+- **WeatherClient** — Open-Meteo (no API key) on its own FreeRTOS task, so a
+  blocking HTTPS call never stalls the display. Fetches every 45 min with
+  exponential backoff; always in Celsius, with conversion done at render time so
+  the units toggle is instant and works on cached data.
+
+### Brightness and power
+
+`BrightnessModel` maps user levels 1–10 onto FastLED brightness 20–200 through an
+explicit table. That bounds the *scale factor* but not frame *content*: at levels
+8–10 an all-white frame would draw 9.4–12.0 A against an 8 A budget. The firmware
+therefore also calls `FastLED.setMaxPowerInVoltsAndMilliamps(5, 8000)`, which
+scales each frame by what it actually contains. **Both are required.** Packet
+brightness in `NetworkMode` is additionally capped at the user's level so a remote
+client cannot exceed it.
 
 Physical LED mapping is column-serpentine: even columns top→bottom, odd columns bottom→top, columns ordered right→left. The mapping is implemented in `getPhysicalIndex(x, y)` in the main `.ino`.
 

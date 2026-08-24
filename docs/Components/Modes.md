@@ -16,7 +16,9 @@ enum class AppMode {
     NETWORK,    // Network Canvas (WebSocket binary API)
     PATTERN,    // Pattern Slideshow
     TIMER,      // Visual Timer
-    OCTOPUS,    // Characters — animated ghost, press cycles colour style
+    OCTOPUS,
+    GAMES,
+    SETTINGS,    // Characters — animated ghost, press cycles colour style
     OFF,        // Screen blank — short press wakes
 };
 ```
@@ -179,3 +181,131 @@ boot menu.
   `updateDisplay()`, so the canvas is never re-pushed.
 - Short press: `goToMenu()` → boot menu.
 - Long press while OFF: ignored.
+
+
+---
+
+## Game Screensavers (`AppMode::GAMES`)
+
+Entered from the boot menu. Driven by `UiMode` → `src/UiController`, so the same
+code runs in the browser simulator (see `docs/adr/0002`).
+
+### Submenu
+
+Three visible rows of `SmallTextRenderer`'s 3×4 font (`ListMenu`):
+
+```
+ y  0- 3   row 0        4px glyph band
+ y     4   gutter
+ y  5- 8   row 1
+ y     9   gutter
+ y 10-13   row 2
+ y    14   gutter
+ y    15   position bar — proportional thumb, tracks the selection
+```
+
+The selected row carries a band in the item's accent colour with bright text on
+top; unselected rows are dim and clipped. Only the selected row scrolls, and only
+if its label exceeds 16px — after a 1.2 s dwell so the opening characters are
+readable. At a 4px advance per character, labels of 4 characters or fewer never
+scroll.
+
+| Entry | Width | Scrolls |
+|-------|-------|---------|
+| `SNAKE` | 20px | yes |
+| `LIFE` | 16px | no |
+| `INVADERS` | 32px | yes |
+| `DINO` | 16px | no |
+| `CYCLE ALL` | 33px | yes |
+
+### Games
+
+All are auto-playing and endless — there are no game-over screens, and losing
+states soft-reset into a fresh round.
+
+| Game | Behaviour |
+|------|-----------|
+| **Snake** | Greedy toward food with a 25% random legal move so the path does not look robotic. Never enters its own body; walls are excluded from the legal move set rather than fatal, so it bumps and turns. Soft-respawns if boxed in. |
+| **Life** | Conway on a 32×32 torus viewed through the 16×16 panel. A decayed heatmap of cell changes steers a camera toward wherever the most is happening. Reseeds when population drops below 20. |
+| **Invaders** | 4×3 formation marching at ⅓ the bullet rate, dropping a row at each wall. The cannon tracks the lowest surviving invader and fires on alignment. Clearing the field or reaching the cannon starts a fresh wave. |
+| **Dino** | Endless runner. Jump is triggered by speed-relative lookahead, not reaction, so every obstacle is cleared. Day/night palette flip; speed ramps then resets. |
+| **Cycle All** | Advances through all four every 20 s. |
+
+### Encoder
+
+- **Turn** — move the selection; while playing, skip to the next game
+- **Short press** — launch the selected game; while playing, restart the round
+- **Long press (3 s)** — *up one level*: a running game returns to the game list;
+  the game list returns to the boot menu
+
+---
+
+## Settings (`AppMode::SETTINGS`)
+
+Same `ListMenu` presentation. Values apply live and are persisted to NVS
+(namespace `leddite`) when confirmed or backed out of.
+
+| Item | Editor |
+|------|--------|
+| `BRIGHTNESS` | Level 1–10 shown as a number over a proportional bar. The panel's own brightness changes as you turn, so the screen is its own preview. |
+| `PLACE` | The `Places` table — `NYC`, `CAMB`, `SFO`, `SLL`, `MCT`, `AMH`, `TVM`. Changing it invalidates the cached weather and refetches immediately. |
+| `UNITS` | Celsius or Fahrenheit. Readings are always fetched in Celsius and converted at render time, so the toggle is instant and works offline. |
+
+### Brightness and power
+
+Levels map through an explicit table to FastLED brightness 20–200. Level 10 is
+deliberately not 255: 256 WS2812B pixels at full white draw roughly 15 A.
+
+| Level | FastLED | Worst case (all white) |
+|-------|---------|------------------------|
+| 1 | 20 | 1.20 A |
+| 4 | 66 | 3.98 A |
+| 7 | 132 | 7.95 A |
+| 10 | 200 | 12.05 A → limited |
+
+The table bounds the scale factor, not frame content, so the firmware also calls
+`FastLED.setMaxPowerInVoltsAndMilliamps(5, 8000)`. Both are required.
+
+---
+
+## Weather (part of `TimeMode`)
+
+The first boot-menu entry cycles clock → date → weather every 10 s.
+
+`WeatherClient` fetches from **Open-Meteo**, which needs no API key and takes
+lat/lon directly, so nothing is stored on the device. It runs on its own FreeRTOS
+task because a blocking HTTPS call on the main loop would freeze the display.
+
+- **Refresh:** every 45 min (~32 requests/day), exponential backoff to a 15 min
+  ceiling on failure. Refreshing on view entry would be ~8,600 requests/day since
+  the views rotate every 10 s — the cached reading is served instead.
+- **Rendering:** `src/WeatherView`, which takes a plain struct and does no
+  networking, so icon selection, unit conversion and layout are all unit-tested.
+
+### Icons
+
+Eleven procedurally drawn shapes cover ~25 WMO codes. Intensity becomes the
+number of precipitation streaks rather than separate icons, and freezing variants
+are a palette swap.
+
+| Icon | WMO codes |
+|------|-----------|
+| `CLEAR_DAY` / `CLEAR_NIGHT` | 0, 1 (by `is_day`) |
+| `PARTLY_DAY` / `PARTLY_NIGHT` | 2 |
+| `CLOUDY` | 3 |
+| `FOG` | 45, 48 |
+| `DRIZZLE` | 51–57 |
+| `RAIN` | 61–67, 80–82 |
+| `SNOW` | 71–77, 85, 86 |
+| `THUNDER` | 95, 96, 99 |
+| `UNKNOWN` | anything else, **and the fetch-failure state** |
+
+`UNKNOWN` doubling as the failure state is deliberate: a failed fetch must never
+render as though it were a live reading.
+
+### Layout
+
+Icon on rows 0–9, temperature on rows 11–14. The place code flashes for 2 s on
+entry. There is **no degree symbol** — at a 4px advance `-12*C` is 18px and would
+scroll on a 16px row. Without it every realistic reading fits, with `-40C` and
+`-60C` landing at exactly 16px.

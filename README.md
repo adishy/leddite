@@ -24,24 +24,35 @@ press to select.
 
 | Mode | Label | Description |
 |------|-------|-------------|
-| Clock + Calendar | **CK** | 24-hour clock (HH sky-blue / MM pink); DVD-bounces around screen once/sec; alternates with date (DD orange / MMM green) every 10 s |
+| Clock + Cal + Weather | **CK** | 24-hour clock (HH sky-blue / MM pink) DVD-bouncing once/sec, cycling every 10 s through date (DD orange / MMM green) and current weather (condition icon + temperature) |
 | Network Canvas | **NT** | WebSocket binary API (port 81); encoder events broadcast as JSON |
 | Pattern Slideshow | **PT** | Rainbow wave, lava lamp, pulse, sparkle; auto-advance 15 s |
 | Visual Timer | **TM** | Encoder sets minutes (1–90), progress-bar countdown |
 | Characters | **OC** | Animated Pac-Man ghost; press cycles 5 colour palettes |
+| Game Screensavers | **GS** | Auto-playing Snake, Game of Life, Space Invaders, Dino Jump, or Cycle All |
+| Settings | **ST** | Brightness (1–10), weather place, temperature units — persisted to NVS |
 
 **Universal gestures**
 - Long press (3 s) → back to boot menu from any mode
 - Long press *in* menu → screen off; short press wakes
 
+Game Screensavers and Settings have a **vertical submenu**: three rows of a 3×4
+font, the selected row carrying a coloured band and scrolling its label if it is
+wider than the panel, with a position bar on the bottom row. Long press there
+goes **up one level** rather than straight out — a running game returns to the
+game list, and an editor returns to the settings list.
+
 ---
 
 ## Quick start — simulator
 
-**Prerequisites:** Python 3.10+, [Emscripten](https://emscripten.org/docs/getting_started/downloads.html) (for rebuilding WASM)
+**Prerequisites:** Python 3.10+ ([uv](https://docs.astral.sh/uv/) preferred), Node 18+ (for the WASM test harness), [Emscripten](https://emscripten.org/docs/getting_started/downloads.html) (only to rebuild WASM)
 
 ```bash
-# Install Python dependencies
+# Install Python dependencies (uv)
+uv venv && uv pip install -r requirements.txt
+
+# ...or with the stdlib venv
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 
