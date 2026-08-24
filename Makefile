@@ -29,7 +29,7 @@ TEST_BINS = test/test_canvas test/test_transformer test/test_protocol test/test_
 
 # --- Targets ---
 
-.PHONY: all clean test simulator check-wasm run-sim help
+.PHONY: all clean test simulator check-wasm check-artifacts run-sim help
 
 all: test simulator
 
@@ -54,6 +54,10 @@ missing = [k for k in [b'Canvas',b'drawSprite',b'getBuffer',b'stopMarquee'] if k
 sys.exit(0) if not missing else (print('WASM check FAILED — bindings missing from .wasm: ' + str([m.decode() for m in missing])), sys.exit(1)) \
 " && echo "WASM binding check passed (Canvas bindings present in .wasm)" \
   || (echo ""; echo "  Run: make simulator   (requires emcc in PATH)"; echo ""; exit 1)
+
+# Fail if any tracked file is a compiled binary (RULES.md section 1)
+check-artifacts:
+	@tools/check-no-binaries.sh
 
 # Build and run native unit tests
 test: $(TEST_BINS)
@@ -111,5 +115,6 @@ help:
 	@echo "  make test        - Build and run native C++ unit tests"
 	@echo "  make simulator   - Build the WebAssembly module for the browser + verify bindings"
 	@echo "  make check-wasm  - Verify committed WASM has Canvas bindings (no rebuild)"
+	@echo "  make check-artifacts - Fail if any compiled binary is tracked in git"
 	@echo "  make run-sim     - Build WASM and start the Python simulator server"
 	@echo "  make clean       - Remove build artifacts"

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Enable with:  git config core.hooksPath .githooks
+#
+# Blocks compiled build artifacts from entering history — see RULES.md §1.
+exec "$(git rev-parse --show-toplevel)/tools/check-no-binaries.sh" --staged

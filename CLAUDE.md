@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Read `RULES.md` first.** It carries the binding repo rules — chiefly that
+> compiled build artifacts are never committed (`make check-artifacts` enforces
+> it; `simulator/leddite_wasm.*` is the one documented exception), and that new
+> mode logic belongs in `src/`, not `esp32_firmware/` (see `docs/adr/0001`).
+
 ## What this project is
 
 Leddite V2 is a 16×16 WS2812B LED matrix driven by an ESP32, with a binary WebSocket API for programmatic control, a WASM-powered browser simulator, and a Python client library. The codebase has three distinct layers: ESP32 firmware (C++/Arduino), a native-compilable C++ core (`src/` + `include/`), and Python tooling.
