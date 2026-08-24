@@ -37,7 +37,16 @@ TEST_BINS = test/test_canvas test/test_transformer test/test_protocol test/test_
 
 # --- Targets ---
 
-.PHONY: all clean test test-wasm simulator check-wasm check-artifacts run-sim help
+.PHONY: all clean test test-wasm simulator check-wasm check-artifacts run-sim ux-review help
+
+# Capture what the committed WASM actually renders and turn it into contact
+# sheets + a metrics table. The sheets are meant to be LOOKED at — see the
+# ux-review skill. Output lands in build/ux/ (gitignored).
+UX_OUT = build/ux
+ux-review:
+	@mkdir -p $(UX_OUT)
+	@node tools/ux/capture.mjs $(SIM_DIR) $(UX_OUT)/frames.json
+	@.venv/bin/python tools/ux/review.py $(UX_OUT)/frames.json $(UX_OUT)
 
 all: test simulator
 
