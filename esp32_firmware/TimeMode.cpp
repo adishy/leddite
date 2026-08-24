@@ -8,9 +8,10 @@
 
 void TimeMode::begin(Canvas& canvas, MarqueeEngine& marquee) {
     marquee.stop();
-    lastSwitchMs = millis();
-    lastDrawSec  = 0;          // force immediate draw
-    showingClock = true;
+    lastSwitchMs  = millis();
+    lastDrawSec   = 0;          // force immediate draw
+    view          = View::CLOCK;
+    viewEnteredMs = millis();
     dvdX = 2; dvdY = 0;
     dvdDX = 1; dvdDY = 1;
     showFace(canvas);
@@ -18,9 +19,10 @@ void TimeMode::begin(Canvas& canvas, MarqueeEngine& marquee) {
 
 void TimeMode::toggleDisplay(Canvas& canvas, MarqueeEngine& marquee) {
     marquee.stop();
-    showingClock = !showingClock;
-    lastSwitchMs = millis();
-    lastDrawSec  = 0;          // force immediate redraw at new position
+    view          = (View)(((uint8_t)view + 1) % (uint8_t)View::COUNT);
+    lastSwitchMs  = millis();
+    viewEnteredMs = lastSwitchMs;
+    lastDrawSec   = 0;          // force immediate redraw at new position
     showFace(canvas);
 }
 
@@ -30,9 +32,18 @@ void TimeMode::update(Canvas& canvas, MarqueeEngine& marquee) {
     // Auto-switch every SWITCH_INTERVAL_MS
     if (now - lastSwitchMs >= SWITCH_INTERVAL_MS) {
         marquee.stop();
-        lastSwitchMs = now;
-        showingClock = !showingClock;
-        lastDrawSec  = 0;
+        lastSwitchMs  = now;
+        view          = (View)(((uint8_t)view + 1) % (uint8_t)View::COUNT);
+        viewEnteredMs = now;
+        lastDrawSec   = 0;
+        showFace(canvas);
+        return;
+    }
+
+    // The weather face is static, so redraw it on the frame clock rather than
+    // waiting for the next second tick — the place-code flash and the animated
+    // precipitation both need sub-second updates.
+    if (view == View::WEATHER) {
         showFace(canvas);
         return;
     }
@@ -46,7 +57,7 @@ void TimeMode::update(Canvas& canvas, MarqueeEngine& marquee) {
     // Clock (12px) stays fully on-screen (0..CLOCK_MAX_X).
     // Calendar (18px) swings ±2 off each edge so both J and N get briefly clipped.
     dvdX += dvdDX;
-    if (showingClock) {
+    if (view == View::CLOCK) {
         if (dvdX <= 0)          { dvdX = 0;           dvdDX =  1; }
         if (dvdX >= CLOCK_MAX_X){ dvdX = CLOCK_MAX_X; dvdDX = -1; }
     } else {
@@ -63,6 +74,8 @@ void TimeMode::update(Canvas& canvas, MarqueeEngine& marquee) {
 // ── Private ───────────────────────────────────────────────────────────────────
 
 void TimeMode::showFace(Canvas& canvas) {
+    if (view == View::WEATHER) { showWeather(canvas); return; }
+
     canvas.clear();
 
     static const char* const MONTH_ABBR[12] = {
@@ -77,7 +90,7 @@ void TimeMode::showFace(Canvas& canvas) {
 
     uint8_t topColor[3], botColor[3];
 
-    if (showingClock) {
+    if (view == View::CLOCK) {
         // Clock: HH (sky-blue) / MM (pink)
         if (gotTime) snprintf(topBuf, sizeof(topBuf), "%02d", timeinfo.tm_hour);
         else         { topBuf[0]='-'; topBuf[1]='-'; topBuf[2]='\0'; }
@@ -114,4 +127,15 @@ void TimeMode::showFace(Canvas& canvas) {
     memset(faceBuf, 0, sizeof(faceBuf));
     TextRenderer::renderText(botBuf, faceBuf, w, h, botColor);
     canvas.drawSprite(faceBuf, (uint8_t)w, (uint8_t)h, dvdX, (int8_t)(dvdY + 8), 0, false);
+}
+
+// ── Weather face ──────────────────────────────────────────────────────────────
+//
+// Rendering lives in WeatherView (src/), which is Arduino-free and unit-tested;
+// this only supplies the data and pushes the result to the canvas.
+
+void TimeMode::showWeather(Canvas& canvas) {
+    const uint32_t elapsed = millis() - viewEnteredMs;
+    WeatherView::render(weatherBuf, weather, unit, placeCode, elapsed);
+    canvas.drawSprite(weatherBuf, 16, 16, 0, 0, 0, /*clearBefore=*/true);
 }

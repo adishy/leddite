@@ -25,7 +25,7 @@
 //   menuMode.onEncoderPress(canvas)    — return chosen AppMode
 class MenuMode {
 public:
-    static const uint8_t  NUM_OPTIONS    = 5;
+    static const uint8_t  NUM_OPTIONS    = 7;
     static const uint16_t MARQUEE_SPEED  = 18;  // px/sec — comfortable reading pace
 
     void begin(Canvas& canvas);
