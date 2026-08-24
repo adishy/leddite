@@ -10,18 +10,45 @@ const WIDTH = 16;
 const HEIGHT = 16;
 const ledElements = [];
 let ledditeCanvas = null;
+let deviceUI = null;
 let wasmModule = null;
 let ws = null;  // kept at module scope so encoder buttons can send on it
 
+// 'network' renders frames arriving over the WebSocket protocol.
+// 'device'  runs the real firmware UI (UiController) compiled to WASM, so the
+//           games/settings/weather screens here are the same code the ESP32
+//           executes rather than a JS reimplementation (docs/adr/0001).
+let renderMode = 'network';
+
+// Mirrors UiController::Screen — for the on-page readout only.
+const SCREEN_NAMES = [
+    'GAMES MENU', 'GAME PLAYING', 'SETTINGS MENU',
+    'BRIGHTNESS', 'PLACES', 'UNITS', 'WEATHER',
+];
+
 // ── WASM init ─────────────────────────────────────────────────────────────────
-Module.onRuntimeInitialized = () => {
-    wasmModule = Module;
-    ledditeCanvas = new wasmModule.Canvas();
-    console.log("WASM logic initialised");
+// The module is built with MODULARIZE=1, so leddite_wasm.js defines a factory
+// instead of assigning a global `Module`. Awaiting it removes the old
+// `var Module = {}` pre-declaration requirement, a missing instance of which
+// previously left the display black with no error.
+createLedditeModule().then((mod) => {
+    wasmModule    = mod;
+    ledditeCanvas = new mod.Canvas();
+    deviceUI      = new mod.DeviceUI();
+
+    // Seed a plausible reading so the weather screen shows something before any
+    // real WeatherClient data exists (12.3 C, clear, daytime).
+    deviceUI.setWeather(123, 0, true, true);
+
+    console.log('WASM logic initialised (Canvas + DeviceUI)');
     initGrid();
     connect();
     animate();
-};
+}).catch((err) => {
+    console.error('WASM failed to initialise:', err);
+    const s = document.getElementById('status-text');
+    if (s) { s.textContent = 'WASM failed to load'; s.style.color = '#f44'; }
+});
 
 // ── LED grid ──────────────────────────────────────────────────────────────────
 function initGrid() {
@@ -36,9 +63,12 @@ function initGrid() {
 }
 
 function updateDOM() {
-    if (!ledditeCanvas) return;
-    const bufferPtr  = ledditeCanvas.getBuffer();
+    const source = (renderMode === 'device') ? deviceUI : ledditeCanvas;
+    if (!source) return;
+
+    const bufferPtr  = source.getBuffer();
     const bufferSize = WIDTH * HEIGHT * 3;
+    // Re-created each call: ALLOW_MEMORY_GROWTH can detach the old ArrayBuffer.
     const buffer     = new Uint8Array(wasmModule.HEAPU8.buffer, bufferPtr, bufferSize);
 
     for (let i = 0; i < WIDTH * HEIGHT; i++) {
@@ -87,13 +117,60 @@ function handleBinary(data) {
         `${width}×${height} @ (${x_offset},${y_offset}) rot=${rotation * 90}° ${isMarquee ? '[marquee]' : ''}`;
 }
 
-// ── Marquee animation loop ────────────────────────────────────────────────────
+// ── Animation loop ────────────────────────────────────────────────────────────
 function animate() {
-    if (ledditeCanvas && ledditeCanvas.isMarqueeActive()) {
+    if (renderMode === 'device') {
+        if (deviceUI) {
+            // The browser supplies nowMs — the same injection the unit tests use.
+            deviceUI.tick(Date.now() >>> 0);
+            updateDOM();
+            const el = document.getElementById('device-screen');
+            if (el) el.textContent = SCREEN_NAMES[deviceUI.screen()] || '—';
+        }
+    } else if (ledditeCanvas && ledditeCanvas.isMarqueeActive()) {
         ledditeCanvas.updateMarquee(Date.now());
         updateDOM();
     }
     requestAnimationFrame(animate);
+}
+
+// ── Render-mode switching ─────────────────────────────────────────────────────
+function setRenderMode(mode) {
+    renderMode = mode;
+    document.getElementById('mode-network').classList.toggle('active', mode === 'network');
+    document.getElementById('mode-device').classList.toggle('active',  mode === 'device');
+    document.getElementById('device-controls').style.display = (mode === 'device') ? '' : 'none';
+    if (mode === 'device' && deviceUI) deviceUI.enterGames(Date.now() >>> 0);
+    updateDOM();
+}
+
+document.getElementById('mode-network').addEventListener('click', () => setRenderMode('network'));
+document.getElementById('mode-device').addEventListener('click',  () => setRenderMode('device'));
+
+document.getElementById('dev-games').addEventListener('click', () => {
+    if (deviceUI) { setRenderMode('device'); deviceUI.enterGames(Date.now() >>> 0); }
+});
+document.getElementById('dev-settings').addEventListener('click', () => {
+    if (deviceUI) { setRenderMode('device'); deviceUI.enterSettings(Date.now() >>> 0); }
+});
+document.getElementById('dev-weather').addEventListener('click', () => {
+    if (deviceUI) { setRenderMode('device'); deviceUI.enterWeather(Date.now() >>> 0); }
+});
+
+// Routes an encoder gesture into the WASM UI. Returns true when it was consumed,
+// so the existing network-mode behaviour is left untouched.
+function deviceUIEncoder(kind, delta) {
+    if (renderMode !== 'device' || !deviceUI) return false;
+    const now = Date.now() >>> 0;
+    if (kind === 'turn')       deviceUI.turn(delta, now);
+    else if (kind === 'press') deviceUI.press(now);
+    else if (kind === 'long') {
+        // true means "nowhere further up" — the device would return to its main
+        // menu here, so the simulator drops back to the games list.
+        if (deviceUI.longPress(now)) deviceUI.enterGames(now);
+    }
+    updateDOM();
+    return true;
 }
 
 // ── WebSocket ─────────────────────────────────────────────────────────────────
@@ -166,28 +243,38 @@ const btnCCW   = document.getElementById('enc-ccw');
 const btnPress = document.getElementById('enc-press');
 const btnCW    = document.getElementById('enc-cw');
 
+// In device mode the gesture drives the WASM UiController directly; in network
+// mode it is broadcast as JSON exactly as before.
 btnCCW.addEventListener('click', () => {
     flashBtn(btnCCW);
+    if (deviceUIEncoder('turn', -1)) return;
     sendEncoderEvent({ type: 'encoder', delta: -1 });
 });
 
 btnCW.addEventListener('click', () => {
     flashBtn(btnCW);
+    if (deviceUIEncoder('turn', 1)) return;
     sendEncoderEvent({ type: 'encoder', delta: 1 });
 });
 
 // Press: mousedown → "pressed" event, mouseup → "released" event
 btnPress.addEventListener('mousedown', () => {
     flashBtn(btnPress, 500);
+    if (deviceUIEncoder('press')) return;
     sendEncoderEvent({ type: 'encoder', button: 'pressed' });
 });
 btnPress.addEventListener('mouseup', () => {
+    if (renderMode === 'device') return;
     sendEncoderEvent({ type: 'encoder', button: 'released' });
 });
 
 // Long-press simulation (L key only — simulates 3 s hold)
 function simulateLongPress() {
     flashBtn(btnPress, 600);
+    if (deviceUIEncoder('long')) {
+        logEncoderEvent('  (long-press → up one level in the device UI)');
+        return;
+    }
     sendEncoderEvent({ type: 'encoder', longPress: true });
     logEncoderEvent('  (long-press simulated — triggers back-to-menu on hardware)');
 }
@@ -202,6 +289,7 @@ document.addEventListener('keydown', (e) => {
         case 'Enter':
         case ' ':          e.preventDefault();
             flashBtn(btnPress, 500);
+            if (deviceUIEncoder('press')) break;
             sendEncoderEvent({ type: 'encoder', button: 'pressed' });
             break;
         case 'l':
@@ -212,6 +300,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 document.addEventListener('keyup', (e) => {
+    if (renderMode === 'device') return;
     if (e.key === 'Enter' || e.key === ' ') {
         sendEncoderEvent({ type: 'encoder', button: 'released' });
     }
