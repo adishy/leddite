@@ -9,13 +9,14 @@
 // MenuMode — boot menu displayed after WiFi connects.
 //
 // Shows full mode names scrolling left-to-right via MarqueeEngine (own instance):
-//   0: "CLOCK + CALENDAR"  (golden amber)
+//   0: "CLOCK CAL WEATHER" (golden amber)
 //   1: "NETWORK CANVAS"    (warm orange)
-//   2: "PATTERN SHOW"      (warm rose)
-//   3: "VISUAL TIMER"      (warm yellow)
-//   4: "OCTOPUS DANCE"     (ocean teal)
+//   2: "VISUAL TIMER"      (warm yellow)
+//   3: "CHARACTERS"        (ocean teal)
+//   4: "GAME SCREENSAVERS" (arcade green)
+//   5: "SETTINGS"          (soft violet)
 //
-// Bottom indicator dots at x=2,5,8,11,14, y=14:
+// Bottom indicator dots at y=14, one per option:
 //   selected = mode accent colour; unselected = dim grey
 //
 // Usage:
@@ -25,7 +26,7 @@
 //   menuMode.onEncoderPress(canvas)    — return chosen AppMode
 class MenuMode {
 public:
-    static const uint8_t  NUM_OPTIONS    = 7;
+    static const uint8_t  NUM_OPTIONS    = 6;
     static const uint16_t MARQUEE_SPEED  = 18;  // px/sec — comfortable reading pace
 
     void begin(Canvas& canvas);
@@ -56,7 +57,7 @@ private:
     // Accent colors per mode [r, g, b]
     static const uint8_t COLORS[NUM_OPTIONS][3];
 
-    // Dot x positions at y=DOT_Y  (5 dots: 2, 5, 8, 11, 14)
+    // Dot x positions at y=DOT_Y
     static const uint8_t DOT_X[NUM_OPTIONS];
     static const uint8_t DOT_Y = 14;
 };

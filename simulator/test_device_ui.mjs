@@ -207,6 +207,101 @@ test('weather renders and honours the unit setting', () => {
   ui.delete();
 });
 
+test('the weather description scrolls in the committed artifact', () => {
+  // The description is the only thing on rows 8-14, so a static frame there
+  // means the scroll never started — which is how the view would silently
+  // degrade to showing only the first two words.
+  const ui = new mod.DeviceUI();
+  ui.setWeather(180, 2, true, true);              // 18.0C, PARTLY CLOUDY
+  ui.enterWeather(0);
+
+  const descRows = (f) => {
+    const out = [];
+    for (let y = 8; y <= 14; y++)
+      for (let x = 0; x < 16; x++) out.push(...px(f, x, y));
+    return out;
+  };
+
+  ui.tick(WEATHER_STEADY);
+  const early = descRows(frame(mod, ui));
+  ui.tick(WEATHER_STEADY + 4000);
+  const later = descRows(frame(mod, ui));
+
+  check(early.some((v) => v !== 0), 'description row is blank');
+  check(!same(Uint8Array.from(early), Uint8Array.from(later)),
+        'description never scrolled');
+  ui.delete();
+});
+
+test('the temperature row stays clear of the description', () => {
+  const ui = new mod.DeviceUI();
+  ui.setWeather(-125, 63, true, true);            // -12.5C, worst-case width
+  ui.enterWeather(0);
+  ui.tick(WEATHER_STEADY);
+  const f = frame(mod, ui);
+
+  // Rows 4, 6, 7 and 15 are structural gaps in the layout.
+  for (const y of [4, 5, 6, 7, 15]) {
+    let lit = false;
+    for (let x = 0; x < 16; x++) {
+      const [r, g, b] = px(f, x, y);
+      if (r | g | b) { lit = true; break; }
+    }
+    check(!lit, `row ${y} should be a gap`);
+  }
+  ui.delete();
+});
+
+test('the selected menu row is taller and brighter, on black', () => {
+  // The selection is signalled by font size and brightness, not by a filled
+  // band (adr/0012). A band regression shows up as a fully lit row; losing the
+  // second font shows up as the tall row shrinking back to 4px.
+  const ui = new mod.DeviceUI();
+  ui.enterGames(0);
+  ui.tick(0);
+  const f = frame(mod, ui);
+
+  const rowStats = (y0, h) => {
+    let lit = 0, peak = 0;
+    for (let y = y0; y < y0 + h; y++)
+      for (let x = 0; x < 16; x++) {
+        const c = px(f, x, y);
+        if (c[0] | c[1] | c[2]) lit++;
+        peak = Math.max(peak, c[0], c[1], c[2]);
+      }
+    return { lit, peak, cells: h * 16 };
+  };
+
+  // Selection starts on item 0, so the rows are 7 / 4 / 4 from the top.
+  const sel = rowStats(0, 7);
+  const other = rowStats(7, 4);
+
+  check(sel.lit > 0, 'selected row is blank');
+  check(sel.lit < sel.cells, 'selected row is a solid block — band regression');
+  check(sel.peak > other.peak, 'selected row is not brighter than an unselected one');
+  ui.delete();
+});
+
+test('the weather view draws no divider rule', () => {
+  // Rows 4-7 are structural blank space. A rule on row 5 would light one of
+  // them clean across the panel.
+  const ui = new mod.DeviceUI();
+  ui.setWeather(185, 63, true, true);
+  ui.enterWeather(0);
+  ui.tick(WEATHER_STEADY);
+  const f = frame(mod, ui);
+
+  for (const y of [4, 5, 6, 7]) {
+    let lit = 0;
+    for (let x = 0; x < 16; x++) {
+      const c = px(f, x, y);
+      if (c[0] | c[1] | c[2]) lit++;
+    }
+    check(lit === 0, `row ${y} should be blank, found ${lit} lit`);
+  }
+  ui.delete();
+});
+
 test('an invalid reading does not render as a valid one', () => {
   const a = new mod.DeviceUI();
   a.setWeather(123, 0, true, true);

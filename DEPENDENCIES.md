@@ -32,7 +32,7 @@ versions are whatever the IDE installs unless otherwise noted.
 | `<string.h>` | libc | `memset()`, `memcpy()`, `snprintf()` (via `<stdio.h>`) |
 | `<stdio.h>` | libc | `snprintf()` |
 | `<stdint.h>` | libc | `uint8_t`, `uint16_t`, `int8_t`, `int16_t`, `uint32_t` |
-| `<math.h>` | libc | `sqrt()` (used in PatternMode) |
+| `<math.h>` | libc | `sqrt()` (used in OctopusMode) |
 
 ---
 

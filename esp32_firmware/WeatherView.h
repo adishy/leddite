@@ -5,16 +5,32 @@
 //
 // Pure C++/stdint only: it takes a plain WeatherData struct and knows nothing
 // about HTTP, JSON or WiFi. The firmware's WeatherClient does the fetching and
-// hands the result here, which keeps icon selection, unit conversion and layout
-// unit-testable without a network.
+// hands the result here, which keeps description mapping, unit conversion and
+// layout unit-testable without a network.
 //
 // LAYOUT
-//   y  0- 9   weather icon (drawn procedurally, not stored as bitmaps)
-//   y 11-14   temperature, e.g. "12C" / "-5F" / "100F"
+//   y  0- 3   temperature, small 3x4 font, e.g. "18*C"  ('*' is the degree mark)
+//   y  8-14   condition description, large 5x7 font, scrolling
 //
-// No degree symbol: the row is 16px and SmallTextRenderer advances 4px per
-// character, so "-12*C" would be 18px and scroll. Without it every realistic
-// reading fits — "-40C" and "-60C" land at exactly 16px.
+// Rows 4-7 are blank. There is deliberately no divider rule between the two:
+// the font-size difference already separates them, and on a real panel a lit
+// divider only competes with the content for attention (docs/adr/0012).
+//
+// WHY NO ICONS
+// ------------
+// This view previously drew procedural sun/cloud/rain icons in rows 0-9. At
+// 16x16 those shapes are near-unreadable and ambiguous between conditions
+// ("partly cloudy" vs "overcast" differ by a couple of pixels), and they cost
+// the whole top half of the panel. Words say it outright, and the freed space
+// is what makes the large font affordable.
+//
+// THE DEGREE MARK
+// ---------------
+// SmallTextRenderer has no ASCII degree sign, so '*' is its designated degree
+// glyph. "18*C" is 14px and fits, but "-12*C" is 18px and would overflow the
+// row. There is no scroll fallback on the temperature — the reading must be
+// legible at a glance — so formatTemp() drops the unit letter rather than the
+// degree when the full string will not fit. See formatTemp().
 //
 // On entry the place code ("NYC", "CAMB") is shown for PLACE_FLASH_MS so it is
 // always clear which location is on screen.
@@ -38,55 +54,67 @@ enum class TempUnit : uint8_t {
 
 class WeatherView {
 public:
-    // Icon shapes. Intensity (slight/moderate/heavy) is expressed as the number
-    // of precipitation streaks rather than as separate icons, and freezing
-    // variants reuse the rain/drizzle shape with an icy palette — which keeps
-    // ~25 WMO codes down to 11 drawable shapes.
-    enum Icon : uint8_t {
-        CLEAR_DAY = 0,
-        CLEAR_NIGHT,
-        PARTLY_DAY,
-        PARTLY_NIGHT,
-        CLOUDY,
-        FOG,
-        DRIZZLE,
-        RAIN,
-        SNOW,
-        THUNDER,
-        UNKNOWN,
-        ICON_COUNT,
-    };
-
     static const uint16_t PLACE_FLASH_MS = 2000;
 
+    // Longest description the table may hold, in characters. TextRenderer's
+    // stride is 6px, so this also fixes the scratch buffer at
+    // DESC_MAX_CHARS * 6 * 7 * 3 bytes. Enforced by a unit test.
+    static const uint8_t DESC_MAX_CHARS = 22;
+
+    // Description scrolling, matching ListMenu's model: hold still long enough
+    // to read the opening word, then scroll and wrap with a gap.
+    //
+    // DESC_PPS is set by a hard deadline, not by taste. TimeMode rotates
+    // clock -> date -> weather every VIEW_BUDGET_MS, of which the place-code
+    // flash consumes PLACE_FLASH_MS. The longest description must finish a full
+    // pass inside what is left, or the tail of "SEVERE THUNDERSTORM" would never
+    // be seen at all. 18 px/s is also what MenuMode scrolls at, so the reading
+    // pace is consistent across the UI. A unit test enforces the deadline.
+    static const uint16_t DESC_DWELL_MS = 900;
+    static const uint8_t  DESC_PPS      = 18;   // px/sec
+    static const uint8_t  DESC_GAP_PX   = 8;
+
+    // How long this view stays on screen before TimeMode rotates away.
+    // Mirrors TimeMode::SWITCH_INTERVAL_MS, which is Arduino-side and so cannot
+    // be included here.
+    static const uint16_t VIEW_BUDGET_MS = 10000;
+
+    // Row geometry (see LAYOUT above).
+    static const uint8_t TEMP_Y = 0;
+    static const uint8_t DESC_Y = 8;
+
     // ── Pure mapping helpers (all unit-tested) ────────────────────────────────
-    static Icon    iconFor(uint8_t wmoCode, bool isDay);
-    static uint8_t precipStreaks(uint8_t wmoCode);   // 2 = slight .. 4 = heavy
-    static bool    isFreezing(uint8_t wmoCode);      // freezing drizzle/rain
+
+    // Human-readable condition, uppercase and restricted to the glyphs
+    // TextRenderer actually has. `isDay` only distinguishes the clear-sky
+    // wording; every other code reads the same day or night.
+    static const char* describe(uint8_t wmoCode, bool isDay);
+
+    // The accent colour for a condition — warm for sun, blue for rain, white
+    // for snow, grey for fog. Both the temperature and the description are
+    // tinted from this so the whole view reads as one state.
+    static void conditionColor(uint8_t wmoCode, bool isDay,
+                               uint8_t& r, uint8_t& g, uint8_t& b);
+
+    static bool isFreezing(uint8_t wmoCode);      // freezing drizzle/rain
 
     // Whole degrees in the requested unit, rounded half away from zero.
     static int16_t displayTemp(int16_t tempC10, TempUnit unit);
 
-    // Formats as "12C" / "-5F" / "100F" — never wider than 16px.
+    // Formats as "18*C" / "-5*C" / "212*F". Never wider than 16px: if the full
+    // string would overflow, the unit letter is dropped ("-12*") rather than
+    // the degree mark.
     static void    formatTemp(int16_t tempC10, TempUnit unit, char* out, size_t n);
 
     // ── Rendering ─────────────────────────────────────────────────────────────
     // `elapsedMs` is time since the view was entered, used for the place-code
-    // flash and for animating precipitation.
+    // flash and to drive the description scroll.
     static void render(uint8_t* buf, const WeatherData& d, TempUnit unit,
                        const char* placeCode, uint32_t elapsedMs);
 
-    // Draws just the icon into rows 0-9. Exposed for tests and the simulator.
-    static void drawIcon(uint8_t* buf, Icon icon, uint8_t streaks,
-                         bool freezing, uint32_t elapsedMs);
-
 private:
-    static void disc(uint8_t* buf, int16_t cx10, int16_t cy10, int16_t r10,
-                     uint8_t r, uint8_t g, uint8_t b);
-    static void cloud(uint8_t* buf, int16_t yOff, uint8_t r, uint8_t g, uint8_t b);
-    static void cloudSmall(uint8_t* buf, int16_t yOff, uint8_t r, uint8_t g, uint8_t b);
-    static void sun(uint8_t* buf, int16_t cx, int16_t cy, bool rays);
-    static void moon(uint8_t* buf, int16_t cx, int16_t cy);
+    // Horizontal offset for the scrolling description at a given elapsed time.
+    static int16_t descScrollOffset(uint16_t descW, uint32_t elapsedMs);
 };
 
 #endif // WEATHER_VIEW_H

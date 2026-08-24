@@ -37,7 +37,16 @@ TEST_BINS = test/test_canvas test/test_transformer test/test_protocol test/test_
 
 # --- Targets ---
 
-.PHONY: all clean test test-wasm simulator check-wasm check-artifacts run-sim help
+.PHONY: all clean test test-wasm simulator check-wasm check-artifacts run-sim ux-review help
+
+# Capture what the committed WASM actually renders and turn it into contact
+# sheets + a metrics table. The sheets are meant to be LOOKED at — see the
+# ux-review skill. Output lands in build/ux/ (gitignored).
+UX_OUT = build/ux
+ux-review:
+	@mkdir -p $(UX_OUT)
+	@node tools/ux/capture.mjs $(SIM_DIR) $(UX_OUT)/frames.json
+	@.venv/bin/python tools/ux/review.py $(UX_OUT)/frames.json $(UX_OUT)
 
 all: test simulator
 
@@ -97,7 +106,7 @@ test/test_color_utils: test/test_color_utils.cpp src/ColorUtils.cpp
 test/test_small_font: test/test_small_font.cpp src/SmallTextRenderer.cpp
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
-test/test_list_menu: test/test_list_menu.cpp src/ListMenu.cpp src/Draw.cpp src/SmallTextRenderer.cpp
+test/test_list_menu: test/test_list_menu.cpp src/ListMenu.cpp src/Draw.cpp src/SmallTextRenderer.cpp src/TextRenderer.cpp
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 test/test_game_engine: test/test_game_engine.cpp src/GameEngine.cpp src/Draw.cpp src/ColorUtils.cpp
@@ -106,7 +115,8 @@ test/test_game_engine: test/test_game_engine.cpp src/GameEngine.cpp src/Draw.cpp
 test/test_brightness: test/test_brightness.cpp src/BrightnessModel.cpp src/Draw.cpp src/SmallTextRenderer.cpp
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
-test/test_weather_view: test/test_weather_view.cpp src/WeatherView.cpp src/Draw.cpp src/SmallTextRenderer.cpp src/Places.cpp
+# TextRenderer is the 5x7 font the condition description is drawn in.
+test/test_weather_view: test/test_weather_view.cpp src/WeatherView.cpp src/Draw.cpp src/SmallTextRenderer.cpp src/TextRenderer.cpp src/Places.cpp
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 # Convenience target to start the simulator server

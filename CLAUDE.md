@@ -170,8 +170,7 @@ The browser (`simulator/index.html` + `simulator.js`) renders via the WASM modul
 The main sketch (`esp32_firmware/esp32_firmware.ino`) is a mode dispatcher. Each mode is a self-contained class with `begin(canvas)` and `update(canvas)` (and mode-specific `onEncoderTurn`/`onEncoderPress`):
 
 - **MenuMode** — boot menu; encoder navigates, press returns `AppMode` enum
-- **TimeMode** — NTP clock (Eastern Time), date, and current weather; cycles every 10 s, DVD-bounces around screen (the weather face is static)
-- **PatternMode** — four patterns (zoom cube tunnel, spinning wireframe pyramid, sparkle, orbiting colour blobs), auto-advance 15s; demo via `demo_3d_patterns.py`
+- **TimeMode** — NTP clock (Eastern Time), date, and current weather; cycles every 10 s, DVD-bounces around screen (the weather face does not bounce — it shows the temperature over a scrolling condition description)
 - **TimerMode** — encoder sets minutes 1–90, progress-bar countdown
 - **NetworkMode** — WebSocket server; relays binary packets to `Canvas`, broadcasts encoder JSON
 - **OctopusMode** — animated character (Pac-Man ghost); encoder cycles 5 colour palettes
@@ -185,7 +184,7 @@ The main sketch (`esp32_firmware/esp32_firmware.ino`) is a mode dispatcher. Each
 
 ### Brightness and power
 
-`BrightnessModel` maps user levels 1–10 onto FastLED brightness 20–200 through an
+`BrightnessModel` maps user levels 1–10 onto FastLED brightness 6–200 through an
 explicit table. That bounds the *scale factor* but not frame *content*: at levels
 8–10 an all-white frame would draw 9.4–12.0 A against an 8 A budget. The firmware
 therefore also calls `FastLED.setMaxPowerInVoltsAndMilliamps(5, 8000)`, which

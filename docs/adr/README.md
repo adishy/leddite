@@ -18,6 +18,8 @@ history; each cites the commits it is reconstructed from.
 | [0008](0008-boot-menu-mode-dispatcher.md) | Boot menu and a mode-dispatcher firmware | 2026-05-24 | Accepted |
 | [0009](0009-mode-logic-in-src-not-firmware.md) | Mode logic belongs in `src/`, not `esp32_firmware/` | 2026-08-23 | Accepted |
 | [0010](0010-simulator-runs-the-real-state-machine.md) | The simulator runs the real state machine, not a copy | 2026-08-23 | Accepted |
+| [0011](0011-words-not-icons-on-a-16x16-panel.md) | Words, not icons, on a 16x16 panel | 2026-08-24 | Accepted |
+| [0012](0012-unlit-is-the-best-background.md) | Unlit is the best background this panel has | 2026-08-24 | Accepted |
 
 ## The thread running through these
 
@@ -32,6 +34,7 @@ Most of what followed is buying that back:
 - **0007** — have the device report its own framebuffer so hardware can be asserted on without a camera
 - **0009** — extend 0003 to mode logic, which 0008 had left behind
 - **0010** — extend 0005 so the simulator runs the real state machine rather than a preview of it
+- **0012** — the first decision made from *rendered output* rather than from reasoning about code, which is what 0005 and 0010 were building toward all along
 
 The recurring failure mode is **a second implementation of the same thing**:
 `demo_3d_patterns.py` re-porting `PatternMode` to Python (0008), a proposed JS

@@ -5,7 +5,6 @@ enum class AppMode {
     MENU,       // Boot menu: navigate with encoder, press to select
     CLOCK_CAL,  // Clock + Calendar + Weather: NTP time (ET), date marquee, current conditions
     NETWORK,    // Network Canvas: WebSocket binary protocol (unchanged), encoder events broadcast
-    PATTERN,    // Pattern Slideshow: lava lamp / rainbow / pulse / sparkle
     TIMER,      // Visual Timer: encoder sets minutes, press starts countdown
     OCTOPUS,    // Octopus Dance: animated chibi octopus, encoder cycles colour style
     GAMES,      // Game Screensavers: auto-playing snake / life / invaders / dino

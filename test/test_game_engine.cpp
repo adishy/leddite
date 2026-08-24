@@ -201,13 +201,66 @@ void test_dino_stays_on_screen() {
     for (int i = 0; i < 20000; i++) {
         t += GameEngine::DINO_STEP_MS;
         ge.update(t);
-        // Row 0 clear of the body means the sprite never left the panel; the
-        // background fill means we check for the bright body colour instead.
+        // The background is black now (adr/0012), so "anything lit in the
+        // dino's columns on row 0" is the whole test — no need to guess at a
+        // brightness threshold that distinguishes sprite from sky.
         const uint8_t* b = ge.buffer();
         for (uint8_t x = 2; x <= 4; x++) {
             const uint16_t i0 = (uint16_t)(0 * 16 + x) * 3;
-            ASSERT(!(b[i0] > 180 && b[i0 + 1] > 180),
+            ASSERT((b[i0] | b[i0 + 1] | b[i0 + 2]) == 0,
                    "dino sprite reached the top row");
+        }
+    }
+    PASS();
+}
+
+void test_no_game_has_a_bright_background() {
+    TEST("no game fills the panel with a background bright enough to compete");
+    // On a real WS2812B panel two LIT colours of similar lightness are far
+    // harder to tell apart than a lit colour against unlit pixels — black is
+    // switched-off pixels, and it is the strongest contrast the panel has.
+    //
+    // Regression: Dino filled the screen with a pale "day" sky (20,24,30) and
+    // drew a dark grey dino (60,70,80) on it. Only about 3x apart in luma, and
+    // on the hardware the sprite was genuinely hard to pick out. Invaders'
+    // (0,0,6) deep-space tint is fine by the same measure — it is effectively
+    // off, and survives this check on purpose.
+    //
+    // The rule: whatever colour dominates the panel is the background, and a
+    // background must be nearly black.
+    static const uint8_t BG_MAX_CHANNEL = 12;
+
+    for (uint8_t g = 0; g < (uint8_t)Game::COUNT; g++) {
+        const uint16_t iv = stepMs((Game)g);
+        ge.begin((Game)g, 0, 0xBACC0 + g);
+        uint32_t t = 0;
+
+        for (int i = 0; i < 600; i++) {
+            t += iv;
+            ge.update(t);
+            const uint8_t* b = ge.buffer();
+
+            // Find the most common colour and how much of the panel it covers.
+            uint16_t bestCount = 0;
+            uint8_t  bestR = 0, bestG = 0, bestB = 0;
+            for (uint16_t p = 0; p < 256; p++) {
+                const uint8_t r = b[p * 3], gg = b[p * 3 + 1], bb = b[p * 3 + 2];
+                uint16_t count = 0;
+                for (uint16_t q = 0; q < 256; q++)
+                    if (b[q * 3] == r && b[q * 3 + 1] == gg && b[q * 3 + 2] == bb) count++;
+                if (count > bestCount) { bestCount = count; bestR = r; bestG = gg; bestB = bb; }
+            }
+
+            // Under half the panel means there is no background fill to judge.
+            if (bestCount < 128) continue;
+
+            uint8_t peak = bestR;
+            if (bestG > peak) peak = bestG;
+            if (bestB > peak) peak = bestB;
+            if (peak > BG_MAX_CHANNEL) {
+                ASSERT(false, "a game filled the panel with a bright background");
+                return;
+            }
         }
     }
     PASS();
@@ -225,5 +278,6 @@ int main() {
     test_invaders_cannon_scores_kills();
     test_dino_jumps_and_lands();
     test_dino_stays_on_screen();
+    test_no_game_has_a_bright_background();
     SUMMARY("GameEngine");
 }
