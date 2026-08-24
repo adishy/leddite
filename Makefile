@@ -23,8 +23,9 @@ WASM_BRIDGE = simulator/wasm_bridge.cpp
 SIM_DIR = simulator
 
 # Test files
-TEST_SRCS = test/test_canvas.cpp test/test_transformer.cpp test/test_protocol.cpp test/test_text_renderer.cpp
-TEST_BINS = test/test_canvas test/test_transformer test/test_protocol test/test_text_renderer
+TEST_BINS = test/test_canvas test/test_transformer test/test_protocol test/test_text_renderer \
+            test/test_color_utils test/test_small_font test/test_list_menu \
+            test/test_game_engine test/test_brightness test/test_weather_view
 
 # --- Targets ---
 
@@ -69,6 +70,25 @@ test/test_protocol: test/test_protocol.cpp src/ProtocolHandler.cpp
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 test/test_text_renderer: test/test_text_renderer.cpp src/TextRenderer.cpp
+	$(CXX) $(CXXFLAGS) $^ -o $@
+
+# Mode-logic tests (docs/adr/0001)
+test/test_color_utils: test/test_color_utils.cpp src/ColorUtils.cpp
+	$(CXX) $(CXXFLAGS) $^ -o $@
+
+test/test_small_font: test/test_small_font.cpp src/SmallTextRenderer.cpp
+	$(CXX) $(CXXFLAGS) $^ -o $@
+
+test/test_list_menu: test/test_list_menu.cpp src/ListMenu.cpp src/Draw.cpp src/SmallTextRenderer.cpp
+	$(CXX) $(CXXFLAGS) $^ -o $@
+
+test/test_game_engine: test/test_game_engine.cpp src/GameEngine.cpp src/Draw.cpp src/ColorUtils.cpp
+	$(CXX) $(CXXFLAGS) $^ -o $@
+
+test/test_brightness: test/test_brightness.cpp src/BrightnessModel.cpp src/Draw.cpp src/SmallTextRenderer.cpp
+	$(CXX) $(CXXFLAGS) $^ -o $@
+
+test/test_weather_view: test/test_weather_view.cpp src/WeatherView.cpp src/Draw.cpp src/SmallTextRenderer.cpp src/Places.cpp
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 # Convenience target to start the simulator server

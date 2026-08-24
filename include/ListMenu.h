@@ -34,7 +34,10 @@ struct MenuItem {
 class ListMenu {
 public:
     static const uint8_t  VISIBLE_ROWS = 3;
-    static const uint8_t  ROW_HEIGHT   = 5;
+    static const uint8_t  ROW_HEIGHT   = 5;   // 4px glyph + 1px gutter
+    static const uint8_t  BAND_HEIGHT  = 4;   // highlight covers the glyph only,
+                                              // leaving the gutter clear so the
+                                              // band never abuts the next label
     static const uint8_t  POS_BAR_Y    = 15;
     static const uint8_t  MAX_ITEMS    = 12;
 

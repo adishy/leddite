@@ -78,7 +78,7 @@ void ListMenu::render(uint8_t* buf, uint32_t nowMs) const {
 
         if (isSel) {
             // Accent band across the full row width, text bright on top.
-            Draw::rect(buf, 0, rowY, Draw::W, ROW_HEIGHT,
+            Draw::rect(buf, 0, rowY, Draw::W, BAND_HEIGHT,
                        Draw::dim(item.r, BAND_SCALE),
                        Draw::dim(item.g, BAND_SCALE),
                        Draw::dim(item.b, BAND_SCALE));
@@ -103,12 +103,12 @@ void ListMenu::render(uint8_t* buf, uint32_t nowMs) const {
         const int16_t xOff = isSel ? scrollOffset(w, nowMs) : 0;
 
         // Glyphs are 4px in a 5px row; the trailing pixel row is the gap.
-        Draw::blitClipped(buf, labelBuf, w, h, xOff, rowY, rowY, ROW_HEIGHT);
+        Draw::blitClipped(buf, labelBuf, w, h, xOff, rowY, rowY, BAND_HEIGHT);
 
         // Second copy so a wrapping scroll has no blank gap at the seam.
         if (isSel && w > Draw::W) {
             Draw::blitClipped(buf, labelBuf, w, h,
-                              (int16_t)(xOff + w + GAP_PX), rowY, rowY, ROW_HEIGHT);
+                              (int16_t)(xOff + w + GAP_PX), rowY, rowY, BAND_HEIGHT);
         }
     }
 
