@@ -3,7 +3,7 @@
 #
 # The Arduino IDE compiles every .cpp/.h sitting beside the .ino, and cannot see
 # ../src or ../include, which is why these files exist twice. See RULES.md §2 and
-# docs/adr/0001. This script makes the duplication mechanical and checkable
+# docs/adr/0009. This script makes the duplication mechanical and checkable
 # instead of hand-maintained; RULES.md §2 is satisfied by running it.
 #
 #   tools/sync-firmware-copies.sh          # copy

@@ -1,10 +1,17 @@
-# ADR 0001 — Mode logic belongs in `src/`, not `esp32_firmware/`
+# ADR 0009 — Mode logic belongs in `src/`, not `esp32_firmware/`
 
 - **Status:** Accepted
 - **Date:** 2026-08-23
 - **Context branch:** `v2-game-screensavers-settings`
+- **Extends:** [ADR 0003](0003-native-compilable-core.md) to the mode layer
+- **Corrects:** [ADR 0008](0008-boot-menu-mode-dispatcher.md), which put modes outside the testable core
 
 ## Context
+
+[ADR 0003](0003-native-compilable-core.md) established a native-compilable core so
+rendering could be unit-tested. [ADR 0008](0008-boot-menu-mode-dispatcher.md) then
+introduced modes — and wrote every one of them directly against `Arduino.h` and
+`FastLED`, outside that core. This ADR closes that gap for new work.
 
 Leddite's C++ is split across two trees that are kept in sync by hand:
 
@@ -76,7 +83,7 @@ builds produce **byte-identical** pixels.
 - `SmallTextRenderer` was validated pixel-for-pixel against the original V1
   Python font implementation, so the port is provably faithful rather than
   plausibly faithful.
-- The simulator can run the real state machine (see ADR 0002), removing the need
+- The simulator can run the real state machine (see ADR 0010), removing the need
   for Python re-implementations like `demo_3d_patterns.py`.
 
 ### Negative

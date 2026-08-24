@@ -64,7 +64,7 @@ are **sources** — nothing in this repo generates them. They stay tracked.
 
 Until the dual-copy is collapsed (tracked as the final step of the
 game-screensavers work), files existing in both `src/` and `esp32_firmware/` must
-be changed in both places, and the WASM rebuilt. See `docs/adr/0001` for why the
+be changed in both places, and the WASM rebuilt. See `docs/adr/0009` for why the
 duplication exists and what replaces it.
 
 ---
@@ -72,4 +72,4 @@ duplication exists and what replaces it.
 ## 3. New mode logic goes in `src/`, not `esp32_firmware/`
 
 Arduino-free, with time and randomness injected, so it can be unit-tested and run
-in the simulator. Full rationale in `docs/adr/0001-mode-logic-in-src-not-firmware.md`.
+in the simulator. Full rationale in `docs/adr/0009-mode-logic-in-src-not-firmware.md`.

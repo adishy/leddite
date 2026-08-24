@@ -58,7 +58,7 @@ public:
 // ── DeviceUI ──────────────────────────────────────────────────────────────────
 //
 // Exposes the real UiController to the browser so the simulator drives exactly
-// the state machine the ESP32 runs (docs/adr/0001), rather than a JS
+// the state machine the ESP32 runs (docs/adr/0009), rather than a JS
 // reimplementation that would silently drift from the firmware.
 //
 // The browser supplies `nowMs`, which is the same injection the unit tests use.

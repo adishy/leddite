@@ -5,7 +5,7 @@
 
 // Games are screensavers: they must never end, never stall and never go blank.
 // These are soak tests over tens of thousands of steps because both real bugs
-// found during development (see docs/adr/0001) only surfaced after the opening
+// found during development (see docs/adr/0009) only surfaced after the opening
 // few seconds of play.
 
 static GameEngine ge;

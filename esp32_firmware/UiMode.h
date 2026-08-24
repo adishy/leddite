@@ -8,7 +8,7 @@
 // UiMode — the Arduino shell around UiController.
 //
 // UiController holds all the navigation logic and is Arduino-free so it can be
-// unit-tested and run in the browser (docs/adr/0001, 0002). This class supplies
+// unit-tested and run in the browser (docs/adr/0009, 0002). This class supplies
 // the three things it deliberately does not know about:
 //
 //   1. millis()          — the time source

@@ -3,7 +3,7 @@
 
 // These pin ColorUtils to FastLED's behaviour. If FastLED ever changes
 // hsv2rgb_rainbow or sin8, these anchors are what catches the drift between the
-// firmware's own FastLED calls and our port (see docs/adr/0001).
+// firmware's own FastLED calls and our port (see docs/adr/0009).
 
 void test_sin8_anchors() {
     TEST("sin8 anchors match FastLED");

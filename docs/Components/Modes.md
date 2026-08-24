@@ -188,7 +188,7 @@ boot menu.
 ## Game Screensavers (`AppMode::GAMES`)
 
 Entered from the boot menu. Driven by `UiMode` → `src/UiController`, so the same
-code runs in the browser simulator (see `docs/adr/0002`).
+code runs in the browser simulator (see `docs/adr/0010`).
 
 ### Submenu
 

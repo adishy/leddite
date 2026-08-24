@@ -5,7 +5,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 > **Read `RULES.md` first.** It carries the binding repo rules — chiefly that
 > compiled build artifacts are never committed (`make check-artifacts` enforces
 > it; `simulator/leddite_wasm.*` is the one documented exception), and that new
-> mode logic belongs in `src/`, not `esp32_firmware/` (see `docs/adr/0001`).
+> mode logic belongs in `src/`, not `esp32_firmware/` (see `docs/adr/0009`).
+>
+> `docs/adr/` records the significant architecture decisions and their costs —
+> start at [`docs/adr/README.md`](docs/adr/README.md).
 
 ## What this project is
 
@@ -49,7 +52,7 @@ The simulator has two render modes. **Network** draws frames arriving over the
 WebSocket protocol. **Device UI** runs the real firmware state machine
 (`src/UiController`) compiled to WASM, so the games, submenus, brightness editor
 and weather view in the browser are the same code the ESP32 executes — not a
-JS reimplementation. See `docs/adr/0002`.
+JS reimplementation. See `docs/adr/0010`.
 
 ### E2E test suite
 
@@ -129,7 +132,7 @@ hand. The `src/` copies have no Arduino dependencies, making them unit-testable
 and WASM-compilable.
 
 **New mode logic must go in `src/`, not `esp32_firmware/`** — Arduino-free, with
-time and randomness injected. See `docs/adr/0001` for why, and `RULES.md` §3.
+time and randomness injected. See `docs/adr/0009` for why, and `RULES.md` §3.
 
 ### Binary WebSocket protocol
 

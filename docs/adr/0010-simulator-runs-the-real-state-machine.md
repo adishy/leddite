@@ -1,13 +1,14 @@
-# ADR 0002 — The simulator runs the real state machine, not a copy of it
+# ADR 0010 — The simulator runs the real state machine, not a copy of it
 
 - **Status:** Accepted
 - **Date:** 2026-08-23
 - **Supersedes part of:** the original plan for this branch
-- **Builds on:** [ADR 0001](0001-mode-logic-in-src-not-firmware.md)
+- **Builds on:** [ADR 0009](0009-mode-logic-in-src-not-firmware.md)
+- **Extends:** [ADR 0005](0005-wasm-browser-simulator.md) from rendering to the full UI
 
 ## Context
 
-ADR 0001 moved mode logic into `src/` so it could be unit-tested. That left an
+ADR 0009 moved mode logic into `src/` so it could be unit-tested. That left an
 open question: how do the new screens get *seen* before hardware?
 
 The initial plan was a native `tools/frame_dump.cpp` that rendered game frames to
@@ -39,7 +40,7 @@ and never touch the artifact the browser loads.
 
 - `src/UiController` holds the whole Games/Settings/Weather navigation state
   machine — screens, input handling, cycling, persisted values. It is Arduino-free
-  per ADR 0001.
+  per ADR 0009.
 - `simulator/wasm_bridge.cpp` exposes it as a `DeviceUI` embind class
   (`turn` / `press` / `longPress` / `tick` / `getBuffer`, plus getters).
 - The ESP32 wrappers (`GameMode`, `SettingsMode`) drive **the same
@@ -94,4 +95,4 @@ features. Native unit tests already assert on game pixels directly, faster and
 with more precision than a WebSocket round-trip.
 
 **Reimplement the menus in JavaScript for the simulator.** Rejected outright —
-this is the exact drift ADR 0001 was written to stop.
+this is the exact drift ADR 0009 was written to stop.

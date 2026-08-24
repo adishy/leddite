@@ -17,7 +17,7 @@ let ws = null;  // kept at module scope so encoder buttons can send on it
 // 'network' renders frames arriving over the WebSocket protocol.
 // 'device'  runs the real firmware UI (UiController) compiled to WASM, so the
 //           games/settings/weather screens here are the same code the ESP32
-//           executes rather than a JS reimplementation (docs/adr/0001).
+//           executes rather than a JS reimplementation (docs/adr/0009).
 let renderMode = 'network';
 
 // Mirrors UiController::Screen — for the on-page readout only.

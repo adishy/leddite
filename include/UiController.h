@@ -3,7 +3,7 @@
 
 // UiController — the navigation state machine for the Games and Settings trees.
 //
-// Pure C++/stdint (docs/adr/0001): no Arduino, no FastLED, no millis(). Both the
+// Pure C++/stdint (docs/adr/0009): no Arduino, no FastLED, no millis(). Both the
 // ESP32 wrappers (GameMode, SettingsMode) and the WASM simulator binding drive
 // *this* object, so the simulator exercises exactly the code the device runs
 // rather than a reimplementation that can drift.

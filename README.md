@@ -17,6 +17,14 @@ for programmatic control.
 
 ---
 
+## Architecture decisions
+
+`docs/adr/` records why this thing is built the way it is — the move from a
+Raspberry Pi to an ESP32, the binary protocol, the WASM simulator, and what each
+of those cost. Index: [`docs/adr/README.md`](docs/adr/README.md).
+
+---
+
 ## Boot menu
 
 On power-up, the display shows a boot menu.  Rotate the encoder to navigate,
