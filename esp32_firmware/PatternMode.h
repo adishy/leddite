@@ -5,14 +5,14 @@
 
 // PatternMode — self-contained pattern slideshow (no network required).
 //
-// Four patterns, cycling automatically every PATTERN_DURATION_MS (15s),
+// Four patterns, cycling automatically every PATTERN_DURATION_MS (15 s),
 // or immediately on encoder turn via nextPattern().
 //
 // Patterns:
-//   0: Rainbow Wave — HSV diagonal rainbow scrolling
-//   1: Lava Lamp    — two slow-moving color blobs via sine oscillation
-//   2: Pulse        — full canvas breathing in a single hue
-//   3: Sparkle      — random twinkling pixels on dark background
+//   0: Spinning Cube — wireframe cube: H-spin → V-spin → zoom, colour changes every 9 s
+//   1: Spiral        — single-arm outwardly-growing Archimedean spiral, colour gradient
+//   2: Sparkle       — random twinkling pixels on dark background
+//   3: Orb Chase     — two colour orbs orbiting at different speeds
 //
 // All patterns render at ~30 FPS (gated by lastFrameMs).
 // pixBuf is a member to avoid 768-byte stack allocation in each draw call.
@@ -20,21 +20,26 @@ class PatternMode {
 public:
     static const uint32_t PATTERN_DURATION_MS = 15000;
     static const uint8_t  NUM_PATTERNS        = 4;
-    static const uint8_t  FRAME_MS            = 33;  // ~30 FPS
+    static const uint8_t  FRAME_MS            = 33;   // ~30 FPS
 
     void begin(Canvas& canvas);
-    void update(Canvas& canvas);    // call each loop()
-    void nextPattern();             // advance immediately (encoder turn)
+    void update(Canvas& canvas);   // call each loop()
+    void nextPattern();            // advance immediately (encoder turn or press)
 
 private:
-    void drawRainbow();
-    void drawLavaLamp();
-    void drawPulse();
-    void drawSparkle();
+    void drawSpinningCube();  // 0: wireframe cube (H-spin → V-spin → zoom)
+    void drawSpiral();        // 1: single-arm outwardly-growing Archimedean spiral
+    void drawSparkle();       // 2: twinkling pixels
+    void drawOrbChase();      // 3: two orbiting colour blobs
 
-    uint8_t  pixBuf[16 * 16 * 3];   // 768 bytes — member to avoid stack pressure
-    uint8_t  sparkleMap[256];        // per-pixel brightness for sparkle decay
-    uint8_t  currentPattern  = 0;
-    uint32_t patternStartMs  = 0;
-    uint32_t lastFrameMs     = 0;
+    // Bresenham line into pixBuf (clips to 16×16)
+    static void drawLine(uint8_t* buf,
+                         int8_t x0, int8_t y0, int8_t x1, int8_t y1,
+                         uint8_t r, uint8_t g, uint8_t b);
+
+    uint8_t  pixBuf[16 * 16 * 3];  // 768 B — kept as member to avoid stack pressure
+    uint8_t  sparkleMap[256];       // per-pixel brightness for sparkle decay
+    uint8_t  currentPattern = 0;
+    uint32_t patternStartMs = 0;
+    uint32_t lastFrameMs    = 0;
 };

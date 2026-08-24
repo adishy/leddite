@@ -42,10 +42,17 @@ public:
     // Last brightness from a packet (0 = use default) — read by main .ino
     uint8_t lastBrightness = DEFAULT_BRIGHTNESS;
 
+    // Ceiling applied to any brightness a packet asks for. Without this a remote
+    // client could set 255 and drive the panel past the user's chosen level and
+    // its power budget. Set from the .ino to the persisted system brightness.
+    void setBrightnessCap(uint8_t cap) { brightnessCap = cap ? cap : 255; }
+
     // Canvas readback response magic byte
     static const uint8_t CANVAS_ACK_MAGIC = 0xCA;
 
 private:
+    uint8_t brightnessCap = 255;
+
     // Send current canvas buffer back to client num as a binary WS frame.
     // Format: [0xCA, width=16, height=16, r,g,b × 256] = 771 bytes.
     void sendCanvasAck(const Canvas& canvas, WebSocketsServer& ws, uint8_t num);

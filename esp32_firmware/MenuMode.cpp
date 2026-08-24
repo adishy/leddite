@@ -5,11 +5,13 @@
 // ── Static data ───────────────────────────────────────────────────────────────
 
 const char* const MenuMode::LABELS[NUM_OPTIONS] = {
-    "CLOCK + CALENDAR",   // 16 chars × 6 = 96px wide
+    "CLOCK CAL WEATHER",  // 17 chars × 6 = 102px wide
     "NETWORK CANVAS",     // 14 chars × 6 = 84px wide
     "PATTERN SHOW",       // 12 chars × 6 = 72px wide
     "VISUAL TIMER",       // 12 chars × 6 = 72px wide
     "CHARACTERS",         // 10 chars × 6 = 60px wide
+    "GAME SCREENSAVERS",  // 17 chars × 6 = 102px wide
+    "SETTINGS",           //  8 chars × 6 = 48px wide
 };
 
 const AppMode MenuMode::MODES[NUM_OPTIONS] = {
@@ -18,19 +20,24 @@ const AppMode MenuMode::MODES[NUM_OPTIONS] = {
     AppMode::PATTERN,
     AppMode::TIMER,
     AppMode::OCTOPUS,
+    AppMode::GAMES,
+    AppMode::SETTINGS,
 };
 
 // Distinct accent color per mode — warm palette + ocean teal for octopus
 const uint8_t MenuMode::COLORS[NUM_OPTIONS][3] = {
-    { 255, 200,  80},  // clock+cal:     golden amber
-    { 255, 130,  40},  // network:       warm orange
-    { 255,  90,  90},  // pattern:       warm rose/coral
-    { 255, 230, 100},  // timer:         warm yellow
-    {  40, 220, 210},  // octopus dance: ocean teal
+    { 255, 200,  80},  // clock+cal+weather: golden amber
+    { 255, 130,  40},  // network:           warm orange
+    { 255,  90,  90},  // pattern:           warm rose/coral
+    { 255, 230, 100},  // timer:             warm yellow
+    {  40, 220, 210},  // characters:        ocean teal
+    { 130, 230, 120},  // game screensavers: arcade green
+    { 190, 150, 255},  // settings:          soft violet
 };
 
-// 5 dots across 16px: x = 2, 5, 8, 11, 14
-const uint8_t MenuMode::DOT_X[NUM_OPTIONS] = {2, 5, 8, 11, 14};
+// 7 dots across 16px at a 2px pitch: x = 2..14, centred (spans 12 of 16 px).
+// The previous 5-dot spacing (2, 5, 8, 11, 14) has no room for two more.
+const uint8_t MenuMode::DOT_X[NUM_OPTIONS] = {2, 4, 6, 8, 10, 12, 14};
 
 // ── Public API ────────────────────────────────────────────────────────────────
 

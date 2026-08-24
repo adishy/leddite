@@ -96,6 +96,9 @@ void NetworkMode::onWebSocketEvent(Canvas& canvas, MarqueeEngine& marquee,
                 // Static sprite
                 marquee.stop();
                 lastBrightness = header.brightness ? header.brightness : DEFAULT_BRIGHTNESS;
+                // Never exceed the user's configured system brightness — that
+                // level is also what the power budget was chosen against.
+                if (lastBrightness > brightnessCap) lastBrightness = brightnessCap;
                 FastLED.setBrightness(lastBrightness);
 
                 canvas.drawSprite(pixelData,

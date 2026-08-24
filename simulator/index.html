@@ -15,6 +15,23 @@
             <div id="led-grid" class="grid-16x16"></div>
         </div>
 
+        <!-- Source of what the panel shows -->
+        <div class="controls">
+            <div class="status">
+                Mode:
+                <button id="mode-network" class="mode-btn active" title="Render frames arriving over the WebSocket protocol">Network</button>
+                <button id="mode-device"  class="mode-btn" title="Run the real firmware UI (games, settings, weather) in WASM">Device UI</button>
+            </div>
+        </div>
+
+        <!-- Device UI entry points — mirror the device's main menu selections -->
+        <div class="controls" id="device-controls" style="display:none">
+            <button id="dev-games"    class="mode-btn">Games</button>
+            <button id="dev-settings" class="mode-btn">Settings</button>
+            <button id="dev-weather"  class="mode-btn">Weather</button>
+            <div class="info">Screen: <span id="device-screen">—</span></div>
+        </div>
+
         <!-- Status + clear -->
         <div class="controls">
             <button id="clear-btn" title="Clear display (C)">Clear</button>
@@ -49,6 +66,11 @@
         </div>
     </div>
 
+    <!-- The WASM module is built with MODULARIZE=1, so this script defines a
+         `createLedditeModule()` factory rather than assigning a global Module.
+         simulator.js awaits that factory, which removes the old requirement to
+         pre-declare `var Module = {}` here — a missing pre-declaration used to
+         black out the simulator entirely. -->
     <script src="leddite_wasm.js"></script>
     <script src="simulator.js"></script>
 </body>

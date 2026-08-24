@@ -42,11 +42,16 @@
 #include "TimerMode.h"
 #include "NetworkMode.h"
 #include "OctopusMode.h"
+#include "UiMode.h"
+#include "WeatherClient.h"
+#include "BrightnessModel.h"
 
 // ── Config ────────────────────────────────────────────────────────────────────
 #define LED_PIN              4
 #define NUM_LEDS             256
-#define BRIGHTNESS           64      // default 25%
+// Brightness is now a user setting persisted in NVS (see UiMode / BrightnessModel).
+// This is only the value used before those settings are loaded.
+#define BRIGHTNESS           BrightnessModel::levelToFastLED(BrightnessModel::DEFAULT_LEVEL)
 #define WS_PORT              81
 #define MARQUEE_BUFFER_SIZE  4096
 
@@ -57,8 +62,10 @@ CRGB             leds[NUM_LEDS];
 MarqueeEngine    marquee;
 uint8_t          marqueeBuffer[MARQUEE_BUFFER_SIZE];
 
-EncoderInput encoder;
-MenuMode     menuMode;
+EncoderInput  encoder;
+UiMode        uiMode;
+WeatherClient weatherClient;
+MenuMode      menuMode;
 TimeMode     timeMode;
 PatternMode  patternMode;
 TimerMode    timerMode;
@@ -100,6 +107,13 @@ void setup() {
 
     // LEDs — init early for visual feedback during boot
     FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
+
+    // Hard power ceiling. The brightness table bounds the scale factor but not
+    // frame CONTENT: at levels 8-10 an all-white frame would pull 9.4-12.0 A
+    // against an 8 A budget. FastLED scales each frame by what it actually
+    // contains, so no combination of level and content can brown out the ESP32.
+    FastLED.setMaxPowerInVoltsAndMilliamps(BrightnessModel::SUPPLY_VOLTS,
+                                           BrightnessModel::MAX_MILLIAMPS);
     FastLED.setBrightness(BRIGHTNESS);
     FastLED.clear();
     FastLED.show();
@@ -146,6 +160,16 @@ void setup() {
     // Mode objects
     networkMode.begin(canvas, webSocket, marquee, marqueeBuffer, MARQUEE_BUFFER_SIZE);
 
+    // Loads brightness / place / units from NVS and applies brightness.
+    uiMode.begin();
+
+    // Remote packets may not exceed the user's chosen brightness.
+    networkMode.setBrightnessCap(BrightnessModel::levelToFastLED(uiMode.brightnessLevel()));
+
+    // Weather fetches on its own task so a blocking HTTPS call never stalls
+    // whatever animation is on screen.
+    weatherClient.begin(uiMode.placeIndex());
+
     // Start in menu
     currentMode = AppMode::MENU;
     menuMode.begin(canvas);
@@ -158,7 +182,8 @@ void setup() {
 static void goToMenu() {
     marquee.stop();
     currentMode = AppMode::MENU;
-    FastLED.setBrightness(BRIGHTNESS);  // reset brightness in case Network changed it
+    // Restore the user's brightness in case a Network packet overrode it.
+    FastLED.setBrightness(BrightnessModel::levelToFastLED(uiMode.brightnessLevel()));
     menuMode.begin(canvas);
     Serial.println("[→ Menu]");
 }
@@ -166,6 +191,20 @@ static void goToMenu() {
 // ── Loop ──────────────────────────────────────────────────────────────────────
 void loop() {
     EncoderEvent ev = encoder.poll();
+
+    // ── Weather plumbing ──────────────────────────────────────────────────────
+    // Cheap: poll() is a struct copy under a spinlock, and the fetch itself runs
+    // on its own task. Changing the place in Settings retargets the client, which
+    // invalidates the cached reading and refetches immediately.
+    weatherClient.setPlace(uiMode.placeIndex());
+    networkMode.setBrightnessCap(BrightnessModel::levelToFastLED(uiMode.brightnessLevel()));
+    {
+        static WeatherData wx;
+        if (weatherClient.poll(wx) || currentMode == AppMode::CLOCK_CAL) {
+            timeMode.setWeather(wx, uiMode.unit(), Places::get(uiMode.placeIndex()).code);
+            uiMode.setWeather(wx);
+        }
+    }
 
     // ── Long-press logic (3s hold) ────────────────────────────────────────────
     if (ev.longPress) {
@@ -176,6 +215,17 @@ void loop() {
             FastLED.clear(true);   // immediately push black to all LEDs
             currentMode = AppMode::OFF;
             Serial.println("[Menu] Screen off — short press to wake");
+            return;
+        } else if (currentMode == AppMode::GAMES || currentMode == AppMode::SETTINGS) {
+            // These modes have their own submenu tree, so long-press means "up
+            // one level". Only when already at a root screen does the mode hand
+            // control back and we return to the main menu.
+            //   playing a game -> game list -> main menu
+            //   brightness/place/units editor -> settings list -> main menu
+            if (uiMode.onLongPress()) {
+                goToMenu();
+            }
+            updateDisplay();
             return;
         } else if (currentMode != AppMode::OFF) {
             // Any other active mode → back to menu
@@ -214,7 +264,8 @@ void loop() {
                     case AppMode::NETWORK:
                         Serial.printf("[Menu] → Network Canvas  ws://%s:%u\n",
                                       WiFi.localIP().toString().c_str(), WS_PORT);
-                        FastLED.setBrightness(BRIGHTNESS);
+                        FastLED.setBrightness(
+                            BrightnessModel::levelToFastLED(uiMode.brightnessLevel()));
                         canvas.clear();
                         break;
                     case AppMode::PATTERN:
@@ -229,6 +280,14 @@ void loop() {
                         Serial.println("[Menu] → Octopus Dance");
                         octopusMode.begin(canvas);
                         break;
+                    case AppMode::GAMES:
+                        Serial.println("[Menu] → Game Screensavers");
+                        uiMode.enterGames(canvas);
+                        break;
+                    case AppMode::SETTINGS:
+                        Serial.println("[Menu] → Settings");
+                        uiMode.enterSettings(canvas);
+                        break;
                     default:
                         break;
                 }
@@ -240,7 +299,7 @@ void loop() {
 
         // ── CLOCK + CALENDAR ──────────────────────────────────────────────────
         case AppMode::CLOCK_CAL:
-            // Short press: toggle clock↔date display early (don't wait 5s)
+            // Short press: advance clock → date → weather early (don't wait 10s)
             if (ev.pressed) {
                 timeMode.toggleDisplay(canvas, marquee);
             }
@@ -288,6 +347,16 @@ void loop() {
                 networkMode.handleEncoder(ev, webSocket);
             }
             networkMode.update(canvas, webSocket, marquee);
+            break;
+
+        // ── GAME SCREENSAVERS / SETTINGS ──────────────────────────────────────
+        // Both are driven by the same UiController (docs/adr/0002), so the
+        // dispatch is identical; only the entry point above differs.
+        case AppMode::GAMES:
+        case AppMode::SETTINGS:
+            if (ev.delta)   uiMode.onEncoderTurn(ev.delta);
+            if (ev.pressed) uiMode.onEncoderPress();
+            uiMode.update(canvas);
             break;
 
         default:

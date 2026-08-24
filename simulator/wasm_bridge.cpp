@@ -1,7 +1,11 @@
 #include "Canvas.h"
 #include "Transformer.h"
 #include "MarqueeEngine.h"
+#include "UiController.h"
+#include "Draw.h"
+#include "WeatherView.h"
 #include <emscripten/bind.h>
+#include <string.h>
 
 using namespace emscripten;
 
@@ -51,7 +55,82 @@ public:
     }
 };
 
+// ── DeviceUI ──────────────────────────────────────────────────────────────────
+//
+// Exposes the real UiController to the browser so the simulator drives exactly
+// the state machine the ESP32 runs (docs/adr/0009), rather than a JS
+// reimplementation that would silently drift from the firmware.
+//
+// The browser supplies `nowMs`, which is the same injection the unit tests use.
+class DeviceUIWrapper {
+public:
+    UiController ui;
+    uint8_t      frame[Draw::SIZE];
+
+    DeviceUIWrapper() { memset(frame, 0, sizeof(frame)); }
+
+    void enterGames(uint32_t nowMs)    { ui.enterGames(nowMs); }
+    void enterSettings(uint32_t nowMs) { ui.enterSettings(nowMs); }
+    void enterWeather(uint32_t nowMs)  { ui.enterWeather(nowMs); }
+
+    void turn(int delta, uint32_t nowMs) { ui.turn(delta, nowMs); }
+    void press(uint32_t nowMs)           { ui.press(nowMs); }
+    bool longPress(uint32_t nowMs)       { return ui.longPress(nowMs); }
+
+    // Advance and render in one call — the browser's animation loop wants both.
+    void tick(uint32_t nowMs) {
+        ui.update(nowMs);
+        ui.render(frame, nowMs);
+    }
+
+    uintptr_t getBuffer() { return reinterpret_cast<uintptr_t>(frame); }
+
+    int screen()          { return (int)ui.screen(); }
+    int brightnessLevel() { return ui.brightnessLevel(); }
+    int placeIndex()      { return ui.placeIndex(); }
+    int unit()            { return (int)ui.unit(); }
+    int currentGame()     { return (int)ui.currentGame(); }
+    bool cycling()        { return ui.cycling(); }
+
+    void setBrightnessLevel(int level) { ui.setBrightnessLevel((uint8_t)level); }
+    void setPlaceIndex(int index)      { ui.setPlaceIndex((uint8_t)index); }
+    void setUnit(int u) {
+        ui.setUnit(u ? TempUnit::FAHRENHEIT : TempUnit::CELSIUS);
+    }
+
+    // Stands in for WeatherClient, which only exists on the firmware side.
+    void setWeather(int tempC10, int wmoCode, bool isDay, bool valid) {
+        WeatherData d;
+        d.tempC10 = (int16_t)tempC10;
+        d.wmoCode = (uint8_t)wmoCode;
+        d.isDay   = isDay;
+        d.valid   = valid;
+        ui.setWeather(d);
+    }
+};
+
 EMSCRIPTEN_BINDINGS(leddite_module) {
+    class_<DeviceUIWrapper>("DeviceUI")
+        .constructor<>()
+        .function("enterGames",          &DeviceUIWrapper::enterGames)
+        .function("enterSettings",       &DeviceUIWrapper::enterSettings)
+        .function("enterWeather",        &DeviceUIWrapper::enterWeather)
+        .function("turn",                &DeviceUIWrapper::turn)
+        .function("press",               &DeviceUIWrapper::press)
+        .function("longPress",           &DeviceUIWrapper::longPress)
+        .function("tick",                &DeviceUIWrapper::tick)
+        .function("getBuffer",           &DeviceUIWrapper::getBuffer)
+        .function("screen",              &DeviceUIWrapper::screen)
+        .function("brightnessLevel",     &DeviceUIWrapper::brightnessLevel)
+        .function("placeIndex",          &DeviceUIWrapper::placeIndex)
+        .function("unit",                &DeviceUIWrapper::unit)
+        .function("currentGame",         &DeviceUIWrapper::currentGame)
+        .function("cycling",             &DeviceUIWrapper::cycling)
+        .function("setBrightnessLevel",  &DeviceUIWrapper::setBrightnessLevel)
+        .function("setPlaceIndex",       &DeviceUIWrapper::setPlaceIndex)
+        .function("setUnit",             &DeviceUIWrapper::setUnit)
+        .function("setWeather",          &DeviceUIWrapper::setWeather);
+
     class_<CanvasWrapper>("Canvas")
         .constructor<>()
         .function("drawSprite", &CanvasWrapper::drawSprite)

@@ -187,3 +187,31 @@ kbd {
     white-space: pre-wrap;
     word-break: break-all;
 }
+
+/* ── Render-mode + device-UI buttons ──────────────────────────────────────────
+   'Network' renders WebSocket protocol frames; 'Device UI' runs the real
+   firmware state machine compiled to WASM (see docs/adr/0001). */
+.mode-btn {
+    background: #1c1f16;
+    border: 1px solid #333c26;
+    color: #9fae87;
+    padding: 6px 12px;
+    margin: 0 3px;
+    border-radius: 6px;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all .2s ease;
+}
+.mode-btn:hover {
+    border-color: #5a6a3c;
+    color: #cfe6a8;
+}
+.mode-btn.active {
+    background: #25341a;
+    color: #c9ff9e;
+    border-color: #7fce4a;
+    box-shadow: 0 0 8px rgba(160, 255, 120, 0.35);
+}
