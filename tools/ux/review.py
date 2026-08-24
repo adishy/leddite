@@ -94,15 +94,13 @@ def gap_rows_clean(frame, gaps):
     return dirty
 
 
-# Layout gaps per scene. A scene absent from here has no reserved rows.
+# Rows the layout reserves as blank, per scene. A scene absent from here has
+# none — which is the case for every menu: ListMenu's rows are 7 + 4 + 4 and fill
+# the panel above the position bar exactly, with no gutters (docs/adr/0012).
 SCENE_GAPS = {
-    'weather.conditions': [4, 6, 7, 15],
-    'weather.temps':      [4, 6, 7, 15],
-    'weather.scroll':     [4, 6, 7, 15],
-    'menu.games':         [4, 9, 14],
-    'menu.settings':      [4, 9, 14],
-    'menu.places':        [4, 9, 14],
-    'menu.scroll':        [4, 9, 14],
+    'weather.conditions': [4, 5, 6, 7, 15],
+    'weather.temps':      [4, 5, 6, 7, 15],
+    'weather.scroll':     [4, 5, 6, 7, 15],
 }
 
 

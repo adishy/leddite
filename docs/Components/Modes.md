@@ -175,37 +175,38 @@ code runs in the browser simulator (see `docs/adr/0010`).
 
 ### Submenu
 
-Three visible rows of `SmallTextRenderer`'s 3×4 font (`ListMenu`):
+Three visible rows, but **not of equal height**: the selected row is drawn in
+the 5x7 medium font and the others in the 3x4 small font (`ListMenu`).
 
 ```
- y  0- 3   row 0        4px glyph band
- y     4   gutter
- y  5- 8   row 1
- y     9   gutter
- y 10-13   row 2
- y    14   gutter
- y    15   position bar — proportional thumb, tracks the selection
+ selected row    7px   TextRenderer 5x7, full accent brightness
+ other rows      4px   SmallTextRenderer 3x4, dimmed
+ y 15            position bar — proportional thumb, tracks the selection
 ```
 
-The selected row carries a band in the item's accent colour at full strength with
-its label **knocked out in black**; unselected rows are dim coloured text on
-black, clipped to their own band. Black text needs `Draw::stencilClipped()` —
-`Draw::blit()` treats pure black as transparent, so a black glyph passed through
-it simply disappears and the band becomes a solid bar. `ListMenu::bandColor()`
-lifts any accent whose brightest channel falls below `BAND_MIN_PEAK` (140),
-preserving its hue, so a dim palette can never leave black-on-black.
+7 + 4 + 4 = 15 exactly, which is why there are no gutters between rows — the
+size difference separates them and a 1px gap would not fit anyway. The layout
+reflows as the selection moves, so anything reasoning about row positions must
+use `rowTop()` / `rowHeight()` rather than multiplying by a constant.
 
-Only the selected row scrolls, and only if its label exceeds 16px — after a 1.2 s
-dwell so the opening characters are readable. At a 4px advance per character,
-labels of 4 characters or fewer never scroll.
+There is **no filled background band** behind the selected row. Selection is
+signalled by size and brightness alone, because on a real WS2812B panel a lit
+background against a lit glyph reads far worse than a lit glyph against unlit
+pixels — see `docs/adr/0012`. `ListMenu::selColor()` lifts any accent whose
+brightest channel falls below `SEL_MIN_PEAK` (140), preserving its hue, so a dim
+palette cannot make the selection disappear.
 
-| Entry | Width | Scrolls |
-|-------|-------|---------|
-| `SNAKE` | 20px | yes |
-| `LIFE` | 16px | no |
-| `INVADERS` | 32px | yes |
-| `DINO` | 16px | no |
-| `CYCLE ALL` | 33px | yes |
+Only the selected row scrolls, after a 1.2 s dwell. TextRenderer's stride is a
+fixed 6px, so barely two characters fit across the panel and nearly every real
+label scrolls — the accepted cost of the larger font.
+
+| Entry | Selected (5x7) | Unselected (3x4) |
+|-------|----------------|------------------|
+| `SNAKE` | 30px, scrolls | 20px |
+| `LIFE` | 24px, scrolls | 16px |
+| `INVADERS` | 48px, scrolls | 32px |
+| `DINO` | 24px, scrolls | 16px |
+| `CYCLE ALL` | 54px, scrolls | 33px |
 
 ### Games
 
@@ -217,7 +218,7 @@ states soft-reset into a fresh round.
 | **Snake** | Greedy toward food with a 25% random legal move so the path does not look robotic. Never enters its own body; walls are excluded from the legal move set rather than fatal, so it bumps and turns. Soft-respawns if boxed in. |
 | **Life** | Conway on a 32×32 torus viewed through the 16×16 panel. A decayed heatmap of cell changes steers a camera toward wherever the most is happening. Reseeds when population drops below 20. |
 | **Invaders** | 4×3 formation marching at ⅓ the bullet rate, dropping a row at each wall. The cannon tracks the lowest surviving invader and fires on alignment. Clearing the field or reaching the cannon starts a fresh wave. |
-| **Dino** | Endless runner. Jump is triggered by speed-relative lookahead, not reaction, so every obstacle is cleared. Day/night palette flip; speed ramps then resets. |
+| **Dino** | Endless runner. Jump is triggered by speed-relative lookahead, not reaction, so every obstacle is cleared. Speed ramps then resets. Day and night differ in the palette of what is *drawn*; the background stays black either way (`docs/adr/0012`). |
 | **Cycle All** | Advances through all four every 20 s. |
 
 ### Encoder

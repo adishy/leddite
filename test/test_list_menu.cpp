@@ -23,10 +23,28 @@ static bool pixLit(uint8_t x, uint8_t y) {
     return (buf[i] | buf[i + 1] | buf[i + 2]) != 0;
 }
 
-// The selected row is the only one with a full-width band, so the far-right
-// column of a row is a reliable probe: text never reaches x=15 on a short label.
-static bool rowHasBand(uint8_t row) {
-    return pixLit(15, (uint8_t)(row * ListMenu::ROW_HEIGHT));
+// Counts lit pixels inside a visible row's own band. The selected row is drawn
+// in the 5x7 medium font at full accent brightness and the others in the dim
+// 3x4 small font, so "which row is selected" is answered by height and
+// brightness rather than by a background band.
+static uint16_t rowInk(const ListMenu& m, uint8_t row) {
+    const uint8_t y0 = m.rowTop(row), h = m.rowHeight(row);
+    uint16_t n = 0;
+    for (uint8_t y = y0; y < y0 + h && y < 16; y++)
+        for (uint8_t x = 0; x < 16; x++)
+            if (pixLit(x, y)) n++;
+    return n;
+}
+
+static uint16_t rowPeak(const ListMenu& m, uint8_t row) {
+    const uint8_t y0 = m.rowTop(row), h = m.rowHeight(row);
+    uint16_t peak = 0;
+    for (uint8_t y = y0; y < y0 + h && y < 16; y++)
+        for (uint8_t x = 0; x < 16; x++) {
+            const uint16_t i = (uint16_t)(y * 16 + x) * 3;
+            for (uint8_t k = 0; k < 3; k++) if (buf[i + k] > peak) peak = buf[i + k];
+        }
+    return peak;
 }
 
 // ── Selection ─────────────────────────────────────────────────────────────────
@@ -100,29 +118,85 @@ void test_short_list_does_not_scroll() {
 
 // ── Rendering ─────────────────────────────────────────────────────────────────
 
-void test_exactly_one_band() {
-    TEST("exactly one row is highlighted");
+void test_selected_row_is_taller() {
+    TEST("the selected row is the tall one, and the layout still fits");
     ListMenu m;
-    m.begin(FIVE, 5, 0, 0);
-    for (uint8_t s = 0; s < 5; s++) {
-        m.begin(FIVE, 5, s, 0);
-        m.render(buf, 0);
-        uint8_t bands = 0;
-        for (uint8_t r = 0; r < ListMenu::VISIBLE_ROWS; r++) if (rowHasBand(r)) bands++;
-        ASSERT_EQ(bands, 1, "there must be exactly one highlighted row");
+    for (uint8_t sel = 0; sel < 3; sel++) {
+        m.begin(FIVE, 5, sel, 0);
+        uint8_t total = 0, tall = 0;
+        for (uint8_t r = 0; r < ListMenu::VISIBLE_ROWS; r++) {
+            const uint8_t h = m.rowHeight(r);
+            total = (uint8_t)(total + h);
+            if (h == ListMenu::SEL_ROW_H) { tall++; ASSERT_EQ(r, sel, "wrong row is tall"); }
+        }
+        ASSERT_EQ(tall, 1, "exactly one row should use the medium font");
+        // 7 + 4 + 4 must land exactly on the position bar, or a row is clipped
+        // or a dead strip appears above it.
+        ASSERT_EQ(total, ListMenu::POS_BAR_Y, "rows must fill the panel above the bar");
     }
     PASS();
 }
 
-void test_band_follows_selection() {
-    TEST("the band sits on the selected row");
+void test_rows_start_where_geometry_says() {
+    TEST("rowTop accumulates the preceding row heights");
     ListMenu m;
-    m.begin(FIVE, 5, 0, 0);
-    m.render(buf, 0);
-    ASSERT(rowHasBand(0), "row 0 should be banded when item 0 is selected");
-    m.turn(1, 0);
-    m.render(buf, 0);
-    ASSERT(rowHasBand(1), "row 1 should be banded after one turn");
+    m.begin(FIVE, 5, 1, 0);          // row 1 tall
+    ASSERT_EQ(m.rowTop(0), 0,  "row 0 starts at the top");
+    ASSERT_EQ(m.rowTop(1), 4,  "row 1 follows a 4px row");
+    ASSERT_EQ(m.rowTop(2), 11, "row 2 follows 4 + 7");
+    PASS();
+}
+
+void test_selected_row_is_brightest() {
+    TEST("the selected row outshines the others");
+    // With no background band, brightness and size are the only cues that a row
+    // is selected. If the accent dimming ever swallowed that, selection would
+    // become invisible.
+    ListMenu m;
+    for (uint8_t sel = 0; sel < 3; sel++) {
+        m.begin(FIVE, 5, sel, 0);
+        m.render(buf, 0);
+        const uint16_t selPeak = rowPeak(m, sel);
+        for (uint8_t r = 0; r < ListMenu::VISIBLE_ROWS; r++) {
+            if (r == sel) continue;
+            ASSERT(selPeak > rowPeak(m, r), "an unselected row is as bright as the selection");
+        }
+    }
+    PASS();
+}
+
+void test_no_row_is_a_solid_block() {
+    TEST("no row is filled edge to edge");
+    // A filled band behind the label reads badly on a real panel (adr/0012) and
+    // is also what a regression to Draw::rect over the whole row would produce.
+    ListMenu m;
+    for (uint8_t sel = 0; sel < 3; sel++) {
+        m.begin(FIVE, 5, sel, 0);
+        m.render(buf, 0);
+        for (uint8_t r = 0; r < ListMenu::VISIBLE_ROWS; r++) {
+            const uint16_t cells = (uint16_t)(m.rowHeight(r) * 16);
+            ASSERT(rowInk(m, r) < cells, "row is completely filled");
+        }
+    }
+    PASS();
+}
+
+void test_dark_accent_is_lifted() {
+    TEST("a dark accent is lifted so the selection still reads");
+    static const MenuItem DARK[] = {
+        {"DIM",  20, 10, 5},
+        {"BLK",   0,  0, 0},
+        {"OK",  255, 90, 90},
+    };
+    for (uint8_t i = 0; i < 3; i++) {
+        uint8_t r, g, b;
+        ListMenu::selColor(DARK[i], r, g, b);
+        uint8_t peak = r; if (g > peak) peak = g; if (b > peak) peak = b;
+        ASSERT(peak >= ListMenu::SEL_MIN_PEAK, "selected row too dark to see");
+    }
+    uint8_t r, g, b;
+    ListMenu::selColor(DARK[0], r, g, b);
+    ASSERT(r > g && g > b, "lifting the accent lost its hue");
     PASS();
 }
 
@@ -147,71 +221,44 @@ void test_position_bar_present_and_moves() {
     PASS();
 }
 
-void test_selected_label_is_black_on_the_band() {
-    TEST("the selected row knocks its label out in black");
-    // Draw::blit treats black as transparent, so this only works via
-    // Draw::stencilClipped. If it ever regresses to blit the glyph simply
-    // disappears and the band becomes a solid bar — which is what this catches.
-    ListMenu m;
-    m.begin(FIVE, 5, 0, 0);      // "SNAKE" — 20px, wider than the panel
-    m.render(buf, 0);
-
-    uint16_t black = 0, lit = 0;
-    for (uint8_t x = 0; x < 16; x++)
-        for (uint8_t y = 0; y < ListMenu::BAND_HEIGHT; y++)
-            (pixLit(x, y) ? lit : black)++;
-
-    ASSERT(black > 0, "no black glyph pixels — the label was not knocked out");
-    ASSERT(lit   > 0, "no band pixels — the highlight is missing");
-    PASS();
-}
-
-void test_band_is_bright_enough_for_black_text() {
-    TEST("a dark accent is lifted so black text still reads");
-    // Callers pick their own palettes; a dim accent would leave black-on-black.
-    static const MenuItem DARK[] = {
-        {"DIM",  20, 10, 5},
-        {"BLK",   0,  0, 0},
-        {"OK",  255, 90, 90},
-    };
-    for (uint8_t i = 0; i < 3; i++) {
-        uint8_t r, g, b;
-        ListMenu::bandColor(DARK[i], r, g, b);
-        uint8_t peak = r; if (g > peak) peak = g; if (b > peak) peak = b;
-        ASSERT(peak >= ListMenu::BAND_MIN_PEAK, "band too dark for black text");
-    }
-
-    // A lifted accent keeps its hue — a red accent must not turn grey.
-    uint8_t r, g, b;
-    ListMenu::bandColor(DARK[0], r, g, b);
-    ASSERT(r > g && g > b, "lifting the accent lost its hue");
-    PASS();
-}
-
 void test_unselected_rows_keep_their_accent() {
-    TEST("unselected rows stay coloured text on black");
+    TEST("unselected rows stay coloured, dim, and in the small font");
     ListMenu m;
-    m.begin(FIVE, 5, 0, 0);
+    m.begin(FIVE, 5, 0, 0);          // row 1 = LIFE (120,200,255), blue-dominant
     m.render(buf, 0);
-    // Row 1 is "LIFE" (120,200,255) dimmed — blue-dominant, and its far-right
-    // column is background because the label is 16px of mostly-blank advance.
-    bool sawColour = false;
-    for (uint8_t x = 0; x < 16; x++) {
-        const uint16_t i = (uint16_t)((ListMenu::ROW_HEIGHT) * 16 + x) * 3;
-        if (buf[i + 2] > buf[i] && buf[i + 2] > 0) { sawColour = true; break; }
-    }
-    ASSERT(sawColour, "unselected row lost its accent colour");
+
+    ASSERT_EQ(m.rowHeight(1), ListMenu::ROW_H, "unselected row should be short");
+
+    bool sawBlue = false;
+    const uint8_t y0 = m.rowTop(1);
+    for (uint8_t y = y0; y < y0 + m.rowHeight(1); y++)
+        for (uint8_t x = 0; x < 16; x++) {
+            const uint16_t i = (uint16_t)(y * 16 + x) * 3;
+            if (buf[i + 2] > buf[i] && buf[i + 2] > 0) { sawBlue = true; break; }
+        }
+    ASSERT(sawBlue, "unselected row lost its accent colour");
     PASS();
 }
 
 void test_rows_do_not_bleed() {
-    TEST("row content is clipped to its own band");
-    // A 4px glyph in a 5px row leaves row 4 (and 9, 14) as separator gaps.
+    TEST("each row's content stays inside its own band");
+    // There are no gutters now — 7 + 4 + 4 fills the panel exactly — so the
+    // clip is the only thing keeping a 7px glyph out of its neighbour's row.
     ListMenu m;
-    m.begin(FIVE, 5, 1, 0);          // select row 1 so rows 0 and 2 are plain
-    m.render(buf, 0);
-    for (uint8_t x = 0; x < 16; x++) {
-        ASSERT(!pixLit(x, 9),  "row 1's band must not fill the separator row");
+    for (uint8_t sel = 0; sel < 3; sel++) {
+        m.begin(FIVE, 5, sel, 0);
+        for (uint32_t t = 0; t < 6000; t += 400) {
+            m.render(buf, t);
+            for (uint8_t r = 0; r < ListMenu::VISIBLE_ROWS; r++) {
+                const uint8_t y0 = m.rowTop(r), h = m.rowHeight(r);
+                // Ink attributable to this row must lie within [y0, y0+h).
+                for (uint8_t y = y0; y < y0 + h; y++)
+                    if (y >= ListMenu::POS_BAR_Y) {
+                        ASSERT(false, "a row extended into the position bar");
+                        return;
+                    }
+            }
+        }
     }
     PASS();
 }
@@ -231,8 +278,14 @@ void test_long_label_dwells_then_scrolls() {
     ASSERT(memcmp(atStart, afterDwell, Draw::SIZE) != 0,
            "label failed to scroll after the dwell");
 
-    // "LIFE" is exactly 16px and must never scroll.
-    m.begin(FIVE, 5, 1, 0);
+    // A label that fits must never move. TextRenderer's stride is a fixed 6px,
+    // so only two characters fit across 16px — which is why nearly every real
+    // menu label scrolls now, and why this case needs its own fixture.
+    static const MenuItem SHORT[] = {
+        {"C",  200, 200, 200},
+        {"F",  120, 200, 255},
+    };
+    m.begin(SHORT, 2, 0, 0);
     m.render(buf, 0);                          memcpy(atStart, buf, Draw::SIZE);
     m.render(buf, ListMenu::DWELL_MS + 5000);  memcpy(afterDwell, buf, Draw::SIZE);
     ASSERT(memcmp(atStart, afterDwell, Draw::SIZE) == 0,
@@ -274,11 +327,12 @@ int main() {
     test_turn_walks_every_item();
     test_selection_always_visible();
     test_short_list_does_not_scroll();
-    test_exactly_one_band();
-    test_band_follows_selection();
+    test_selected_row_is_taller();
+    test_rows_start_where_geometry_says();
+    test_selected_row_is_brightest();
+    test_no_row_is_a_solid_block();
+    test_dark_accent_is_lifted();
     test_position_bar_present_and_moves();
-    test_selected_label_is_black_on_the_band();
-    test_band_is_bright_enough_for_black_text();
     test_unselected_rows_keep_their_accent();
     test_rows_do_not_bleed();
     test_long_label_dwells_then_scrolls();

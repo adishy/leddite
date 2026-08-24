@@ -106,7 +106,7 @@ test/test_color_utils: test/test_color_utils.cpp src/ColorUtils.cpp
 test/test_small_font: test/test_small_font.cpp src/SmallTextRenderer.cpp
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
-test/test_list_menu: test/test_list_menu.cpp src/ListMenu.cpp src/Draw.cpp src/SmallTextRenderer.cpp
+test/test_list_menu: test/test_list_menu.cpp src/ListMenu.cpp src/Draw.cpp src/SmallTextRenderer.cpp src/TextRenderer.cpp
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 test/test_game_engine: test/test_game_engine.cpp src/GameEngine.cpp src/Draw.cpp src/ColorUtils.cpp

@@ -10,8 +10,11 @@
 //
 // LAYOUT
 //   y  0- 3   temperature, small 3x4 font, e.g. "18*C"  ('*' is the degree mark)
-//   y  5      1px rule in the condition colour
 //   y  8-14   condition description, large 5x7 font, scrolling
+//
+// Rows 4-7 are blank. There is deliberately no divider rule between the two:
+// the font-size difference already separates them, and on a real panel a lit
+// divider only competes with the content for attention (docs/adr/0012).
 //
 // WHY NO ICONS
 // ------------
@@ -78,7 +81,6 @@ public:
 
     // Row geometry (see LAYOUT above).
     static const uint8_t TEMP_Y = 0;
-    static const uint8_t RULE_Y = 5;
     static const uint8_t DESC_Y = 8;
 
     // ── Pure mapping helpers (all unit-tested) ────────────────────────────────

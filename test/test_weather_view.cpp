@@ -267,7 +267,7 @@ void test_layout_bands_are_respected() {
         for (uint32_t t = STEADY; t < STEADY + 6000; t += 700) {
             WeatherView::render(buf, reading(-125, c, true),
                                 TempUnit::FAHRENHEIT, "NYC", t);
-            const uint8_t GAPS[] = { 4, 6, 7, 15 };
+            const uint8_t GAPS[] = { 4, 5, 6, 7, 15 };
             for (uint8_t y : GAPS) {
                 if (rowLit(buf, y)) { ASSERT(false, "content bled into a gap row"); return; }
             }
@@ -276,16 +276,25 @@ void test_layout_bands_are_respected() {
     PASS();
 }
 
-void test_rule_is_drawn_in_the_condition_colour() {
-    TEST("the rule carries the condition's hue");
+void test_description_carries_the_condition_hue() {
+    TEST("the description carries the condition's hue");
     WeatherView::render(buf, reading(120, 63, true), TempUnit::CELSIUS, "NYC", STEADY);
-    const uint16_t i = (uint16_t)(WeatherView::RULE_Y * 16 + 8) * 3;
-    const uint8_t  rr = buf[i], rg = buf[i + 1], rb = buf[i + 2];
-    ASSERT((rr | rg | rb) != 0, "rule not drawn");
-    ASSERT(rb > rr, "rain's rule should be blue-dominant");
+    uint32_t r = 0, g = 0, b = 0;
+    for (uint8_t y = WeatherView::DESC_Y; y < WeatherView::DESC_Y + 7; y++)
+        for (uint8_t x = 0; x < 16; x++) {
+            const uint16_t i = (uint16_t)(y * 16 + x) * 3;
+            r += buf[i]; g += buf[i + 1]; b += buf[i + 2];
+        }
+    ASSERT(b > r, "rain should read blue-dominant");
 
     WeatherView::render(buf, reading(120, 0, true), TempUnit::CELSIUS, "NYC", STEADY);
-    ASSERT(buf[i] > buf[i + 2], "clear day's rule should be warm-dominant");
+    r = g = b = 0;
+    for (uint8_t y = WeatherView::DESC_Y; y < WeatherView::DESC_Y + 7; y++)
+        for (uint8_t x = 0; x < 16; x++) {
+            const uint16_t i = (uint16_t)(y * 16 + x) * 3;
+            r += buf[i]; g += buf[i + 1]; b += buf[i + 2];
+        }
+    ASSERT(r > b, "clear day should read warm-dominant");
     PASS();
 }
 
@@ -377,7 +386,7 @@ void test_no_place_code_is_safe() {
     for (uint32_t t = 0; t < 3000; t += 100) {
         WeatherView::render(buf, d, TempUnit::CELSIUS, nullptr, t);
         if (!anyLit(buf)) { ASSERT(false, "rendered blank with no place code"); return; }
-        const uint8_t GAPS[] = { 4, 6, 7, 15 };
+        const uint8_t GAPS[] = { 4, 5, 6, 7, 15 };
         for (uint8_t y : GAPS)
             if (rowLit(buf, y)) { ASSERT(false, "content bled into a gap row"); return; }
     }
@@ -422,7 +431,7 @@ int main() {
     test_format_strings();
     test_every_code_renders_something();
     test_layout_bands_are_respected();
-    test_rule_is_drawn_in_the_condition_colour();
+    test_description_carries_the_condition_hue();
     test_description_dwells_then_scrolls();
     test_scroll_never_leaves_the_row_blank();
     test_invalid_data_is_visibly_distinct();

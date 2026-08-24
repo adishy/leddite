@@ -525,13 +525,20 @@ void GameEngine::stepDino() {
 }
 
 void GameEngine::drawDino() {
-    // Palette flips wholesale between day and night.
-    const uint8_t bgR = night ? 4   : 20,  bgG = night ? 6   : 24, bgB = night ? 18 : 30;
-    const uint8_t fgR = night ? 210 : 60,  fgG = night ? 220 : 70, fgB = night ? 255 : 80;
-    const uint8_t grR = night ? 60  : 110, grG = night ? 70  : 100, grB = night ? 110 : 70;
-    const uint8_t caR = night ? 90  : 60,  caG = night ? 200 : 170, caB = night ? 150 : 70;
+    // The background stays BLACK in both palettes. The original "day" mode lit
+    // every pixel with a pale sky and drew a dark grey dino on top; on a real
+    // WS2812B panel that reads badly, because two lit colours of similar
+    // lightness are much harder to tell apart than a lit colour against unlit
+    // LEDs. Black is not a colour here — it is switched-off pixels, and it is
+    // the strongest contrast the panel has.
+    //
+    // Day and night therefore differ in the palette of what is *drawn*, not in
+    // what is behind it: warm and bright by day, cool and dimmer by night.
+    const uint8_t fgR = night ? 150 : 235, fgG = night ? 175 : 240, fgB = night ? 225 : 245;
+    const uint8_t grR = night ? 55  : 165, grG = night ? 70  : 140, grB = night ? 105 : 70;
+    const uint8_t caR = night ? 60  : 70,  caG = night ? 165 : 205, caB = night ? 130 : 80;
 
-    Draw::fill(buf, bgR, bgG, bgB);
+    Draw::clear(buf);
 
     // Ground line plus a scrolling speckle so motion is visible even with no
     // obstacle on screen.

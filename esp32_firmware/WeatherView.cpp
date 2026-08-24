@@ -222,9 +222,10 @@ void WeatherView::render(uint8_t* buf, const WeatherData& d, TempUnit unit,
         Draw::blit(buf, txtBuf, w, h, (int16_t)((Draw::W - (int16_t)w) / 2), TEMP_Y);
     }
 
-    // ── Rule ──────────────────────────────────────────────────────────────────
-    Draw::rect(buf, 0, RULE_Y, Draw::W, 1,
-               Draw::dim(cr, 110), Draw::dim(cg, 110), Draw::dim(cb, 110));
+    // No rule between the two. A lit divider adds nothing a blank row does not
+    // already do — the size difference between the two fonts separates them —
+    // and on a real panel every extra lit row competes with the content for the
+    // eye. See docs/adr/0012.
 
     // ── Description ───────────────────────────────────────────────────────────
     if (TextRenderer::textWidth(desc) > DESC_MAX_W) return;   // guarded by a test
