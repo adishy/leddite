@@ -82,7 +82,6 @@ On boot the firmware:
 5. Shows the **boot menu** on the LED panel — rotate encoder to select:
    - `CK` — Clock + Calendar (NTP time / scrolling date)
    - `NT` — Network Canvas (WebSocket binary protocol, port 81)
-   - `PT` — Pattern Slideshow (rainbow, lava lamp, pulse, sparkle)
    - `TM` — Visual Timer (rotary encoder sets minutes)
 6. Press encoder to enter selected mode. Press again to return to menu.
    In Network Canvas mode: long-press (2s) to return to menu.
@@ -91,7 +90,7 @@ Serial output at 115200 baud shows IP, mode transitions, and encoder events.
 
 ### Rotary Encoder
 - **CLK** → GPIO 32  |  **DT** → GPIO 33  |  **Button** → GPIO 25
-- Turn: navigate menu / adjust timer / skip pattern
+- Turn: navigate menu / adjust timer / cycle character style
 - Short press: select / confirm / back to menu
 - Long press (2s): back to menu (Network Canvas mode only)
 

@@ -3,11 +3,17 @@
 #include "SmallTextRenderer.h"
 #include <stdio.h>
 
-// Level 1 stays usable in a dark room; level 10 is the highest value that keeps
-// typical (non-white-field) content inside the supply budget without leaning on
-// FastLED's frame limiter for every frame.
+// Levels 1-2 are the "dark room at night" end and are deliberately very dim: 6
+// is about the lowest a WS2812B holds a stable colour at, below which channels
+// start dropping out and whites go green. Level 10 is the highest value that
+// keeps typical (non-white-field) content inside the supply budget without
+// leaning on FastLED's frame limiter for every frame.
+//
+// The bottom of the range is spaced much more tightly than the top because
+// perceived brightness is roughly logarithmic — the step from 6 to 16 looks
+// about as large as the step from 132 to 156.
 const uint8_t BrightnessModel::LEVEL_TABLE[BrightnessModel::MAX_LEVEL] = {
-    20, 32, 48, 66, 86, 108, 132, 156, 178, 200
+    6, 16, 36, 66, 86, 108, 132, 156, 178, 200
 };
 
 uint8_t BrightnessModel::clampLevel(int level) {

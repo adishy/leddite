@@ -18,10 +18,14 @@ void test_clamp_handles_garbage() {
 
 void test_level_endpoints() {
     TEST("level endpoints");
-    ASSERT_EQ(BrightnessModel::levelToFastLED(1),  20,  "level 1");
+    ASSERT_EQ(BrightnessModel::levelToFastLED(1),  6,   "level 1");
     ASSERT_EQ(BrightnessModel::levelToFastLED(10), 200, "level 10");
     ASSERT(BrightnessModel::levelToFastLED(10) < 255,
            "level 10 must not be full brightness — 256 white LEDs draw ~15 A");
+    // Below ~5 a WS2812B stops holding a stable colour: channels drop out and
+    // white shifts green. Dim is the point of level 1; broken is not.
+    ASSERT(BrightnessModel::levelToFastLED(1) >= 5,
+           "level 1 must stay above the WS2812B colour-stability floor");
     PASS();
 }
 
@@ -36,7 +40,7 @@ void test_level_mapping_is_strictly_increasing() {
 
 void test_out_of_range_levels_are_safe() {
     TEST("levelToFastLED clamps rather than reading past the table");
-    ASSERT_EQ(BrightnessModel::levelToFastLED(0),   20,  "level 0");
+    ASSERT_EQ(BrightnessModel::levelToFastLED(0),   6,   "level 0");
     ASSERT_EQ(BrightnessModel::levelToFastLED(200), 200, "level 200");
     PASS();
 }

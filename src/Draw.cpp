@@ -69,6 +69,25 @@ void Draw::blitClipped(uint8_t* buf, const uint8_t* src, uint16_t sw, uint16_t s
     }
 }
 
+void Draw::stencilClipped(uint8_t* buf, const uint8_t* src, uint16_t sw, uint16_t sh,
+                          int16_t x, int16_t y, int16_t clipY0, int16_t clipH,
+                          uint8_t r, uint8_t g, uint8_t b) {
+    for (uint16_t sy = 0; sy < sh; sy++) {
+        const int16_t dy = (int16_t)(y + sy);
+        if (dy < clipY0 || dy >= clipY0 + clipH) continue;
+
+        for (uint16_t sx = 0; sx < sw; sx++) {
+            const uint32_t si = ((uint32_t)sy * sw + sx) * 3;
+
+            // Coverage only — the source colour is discarded. A black *output*
+            // is therefore still written, which is the whole point.
+            if ((src[si] | src[si + 1] | src[si + 2]) == 0) continue;
+
+            px(buf, (int16_t)(x + sx), dy, r, g, b);
+        }
+    }
+}
+
 uint8_t Draw::dim(uint8_t c, uint8_t scale) {
     return (uint8_t)(((uint16_t)c * (uint16_t)scale) >> 8);
 }

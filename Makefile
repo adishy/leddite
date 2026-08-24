@@ -106,7 +106,8 @@ test/test_game_engine: test/test_game_engine.cpp src/GameEngine.cpp src/Draw.cpp
 test/test_brightness: test/test_brightness.cpp src/BrightnessModel.cpp src/Draw.cpp src/SmallTextRenderer.cpp
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
-test/test_weather_view: test/test_weather_view.cpp src/WeatherView.cpp src/Draw.cpp src/SmallTextRenderer.cpp src/Places.cpp
+# TextRenderer is the 5x7 font the condition description is drawn in.
+test/test_weather_view: test/test_weather_view.cpp src/WeatherView.cpp src/Draw.cpp src/SmallTextRenderer.cpp src/TextRenderer.cpp src/Places.cpp
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 # Convenience target to start the simulator server

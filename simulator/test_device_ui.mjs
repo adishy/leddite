@@ -207,6 +207,71 @@ test('weather renders and honours the unit setting', () => {
   ui.delete();
 });
 
+test('the weather description scrolls in the committed artifact', () => {
+  // The description is the only thing on rows 8-14, so a static frame there
+  // means the scroll never started — which is how the view would silently
+  // degrade to showing only the first two words.
+  const ui = new mod.DeviceUI();
+  ui.setWeather(180, 2, true, true);              // 18.0C, PARTLY CLOUDY
+  ui.enterWeather(0);
+
+  const descRows = (f) => {
+    const out = [];
+    for (let y = 8; y <= 14; y++)
+      for (let x = 0; x < 16; x++) out.push(...px(f, x, y));
+    return out;
+  };
+
+  ui.tick(WEATHER_STEADY);
+  const early = descRows(frame(mod, ui));
+  ui.tick(WEATHER_STEADY + 4000);
+  const later = descRows(frame(mod, ui));
+
+  check(early.some((v) => v !== 0), 'description row is blank');
+  check(!same(Uint8Array.from(early), Uint8Array.from(later)),
+        'description never scrolled');
+  ui.delete();
+});
+
+test('the temperature row stays clear of the description', () => {
+  const ui = new mod.DeviceUI();
+  ui.setWeather(-125, 63, true, true);            // -12.5C, worst-case width
+  ui.enterWeather(0);
+  ui.tick(WEATHER_STEADY);
+  const f = frame(mod, ui);
+
+  // Rows 4, 6, 7 and 15 are structural gaps in the layout.
+  for (const y of [4, 6, 7, 15]) {
+    let lit = false;
+    for (let x = 0; x < 16; x++) {
+      const [r, g, b] = px(f, x, y);
+      if (r | g | b) { lit = true; break; }
+    }
+    check(!lit, `row ${y} should be a gap`);
+  }
+  ui.delete();
+});
+
+test('the selected menu row knocks its label out in black', () => {
+  // Draw::blit treats black as transparent; this only works through
+  // Draw::stencilClipped. A regression makes the band a solid bar with no
+  // readable label, which litCount alone would not notice.
+  const ui = new mod.DeviceUI();
+  ui.enterGames(0);
+  ui.tick(0);
+  const f = frame(mod, ui);
+
+  let black = 0, lit = 0;
+  for (let x = 0; x < 16; x++)
+    for (let y = 0; y < 4; y++) {
+      const [r, g, b] = px(f, x, y);
+      (r | g | b) ? lit++ : black++;
+    }
+  check(lit > 0, 'selected row has no band');
+  check(black > 0, 'selected row has no black glyph pixels');
+  ui.delete();
+});
+
 test('an invalid reading does not render as a valid one', () => {
   const a = new mod.DeviceUI();
   a.setWeather(123, 0, true, true);

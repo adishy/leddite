@@ -32,9 +32,8 @@ press to select.
 
 | Mode | Label | Description |
 |------|-------|-------------|
-| Clock + Cal + Weather | **CK** | 24-hour clock (HH sky-blue / MM pink) DVD-bouncing once/sec, cycling every 10 s through date (DD orange / MMM green) and current weather (condition icon + temperature) |
+| Clock + Cal + Weather | **CK** | 24-hour clock (HH sky-blue / MM pink) DVD-bouncing once/sec, cycling every 10 s through date (DD orange / MMM green) and current weather (temperature + scrolling condition) |
 | Network Canvas | **NT** | WebSocket binary API (port 81); encoder events broadcast as JSON |
-| Pattern Slideshow | **PT** | Rainbow wave, lava lamp, pulse, sparkle; auto-advance 15 s |
 | Visual Timer | **TM** | Encoder sets minutes (1–90), progress-bar countdown |
 | Characters | **OC** | Animated Pac-Man ghost; press cycles 5 colour palettes |
 | Game Screensavers | **GS** | Auto-playing Snake, Game of Life, Space Invaders, Dino Jump, or Cycle All |
@@ -159,11 +158,10 @@ make test
 
 ```
 esp32_firmware/       Production ESP32 sketch + all mode modules
-  AppState.h            AppMode enum (MENU, CLOCK_CAL, NETWORK, PATTERN, TIMER, OCTOPUS, OFF)
+  AppState.h            AppMode enum (MENU, CLOCK_CAL, NETWORK, TIMER, OCTOPUS, GAMES, SETTINGS, OFF)
   EncoderInput.*        Rotary encoder driver (CLK/DT/button, long-press detection)
   MenuMode.*            Boot menu (scrolling name, indicator dots, warm color palette)
   TimeMode.*            Clock + Calendar mode
-  PatternMode.*         Pattern slideshow (4 patterns, auto-advance)
   TimerMode.*           Visual countdown timer
   NetworkMode.*         WebSocket binary protocol + encoder JSON broadcast
   Canvas/Transformer/MarqueeEngine/ProtocolHandler/TextRenderer — mirrors of src/

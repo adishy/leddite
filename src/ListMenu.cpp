@@ -8,6 +8,11 @@
 static const uint16_t LABEL_MAX_W = 96;
 static uint8_t        labelBuf[LABEL_MAX_W * SmallTextRenderer::CHAR_HEIGHT * 3];
 
+// Glyphs are stencilled onto the selected row, so the colour they are rendered
+// in is discarded — only coverage matters. White keeps every glyph pixel
+// non-black, which is what stencilClipped() tests against.
+static const uint8_t MASK_COLOR[3] = { 255, 255, 255 };
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 void ListMenu::begin(const MenuItem* items, uint8_t count, uint8_t selected,
@@ -58,6 +63,34 @@ int16_t ListMenu::scrollOffset(uint16_t labelW, uint32_t nowMs) const {
     return (int16_t)-(int16_t)(moved % travel);
 }
 
+// ── Band colour ───────────────────────────────────────────────────────────────
+
+void ListMenu::bandColor(const MenuItem& item, uint8_t& r, uint8_t& g, uint8_t& b) {
+    uint8_t peak = item.r;
+    if (item.g > peak) peak = item.g;
+    if (item.b > peak) peak = item.b;
+
+    if (peak >= BAND_MIN_PEAK || peak == 0) {
+        // Bright enough already, or a black accent that no scaling can rescue —
+        // fall back to a neutral grey rather than emitting an invisible band.
+        r = peak ? item.r : BAND_MIN_PEAK;
+        g = peak ? item.g : BAND_MIN_PEAK;
+        b = peak ? item.b : BAND_MIN_PEAK;
+        return;
+    }
+
+    // Scale the whole triple so the hue is preserved and the brightest channel
+    // lands exactly on the floor.
+    const uint16_t k = (uint16_t)((BAND_MIN_PEAK * 256u) / peak);
+    auto lift = [k](uint8_t c) -> uint8_t {
+        const uint32_t v = ((uint32_t)c * k) >> 8;
+        return (uint8_t)(v > 255 ? 255 : v);
+    };
+    r = lift(item.r);
+    g = lift(item.g);
+    b = lift(item.b);
+}
+
 // ── Render ────────────────────────────────────────────────────────────────────
 
 void ListMenu::render(uint8_t* buf, uint32_t nowMs) const {
@@ -77,12 +110,15 @@ void ListMenu::render(uint8_t* buf, uint32_t nowMs) const {
         uint8_t textColor[3];
 
         if (isSel) {
-            // Accent band across the full row width, text bright on top.
-            Draw::rect(buf, 0, rowY, Draw::W, BAND_HEIGHT,
-                       Draw::dim(item.r, BAND_SCALE),
-                       Draw::dim(item.g, BAND_SCALE),
-                       Draw::dim(item.b, BAND_SCALE));
-            textColor[0] = 255; textColor[1] = 255; textColor[2] = 255;
+            // Accent band across the full row width; the label is knocked out of
+            // it in black below.
+            uint8_t br, bg, bb;
+            bandColor(item, br, bg, bb);
+            Draw::rect(buf, 0, rowY, Draw::W, BAND_HEIGHT, br, bg, bb);
+
+            textColor[0] = MASK_COLOR[0];
+            textColor[1] = MASK_COLOR[1];
+            textColor[2] = MASK_COLOR[2];
         } else {
             textColor[0] = Draw::dim(item.r, DIM_SCALE);
             textColor[1] = Draw::dim(item.g, DIM_SCALE);
@@ -103,12 +139,17 @@ void ListMenu::render(uint8_t* buf, uint32_t nowMs) const {
         const int16_t xOff = isSel ? scrollOffset(w, nowMs) : 0;
 
         // Glyphs are 4px in a 5px row; the trailing pixel row is the gap.
-        Draw::blitClipped(buf, labelBuf, w, h, xOff, rowY, rowY, BAND_HEIGHT);
-
-        // Second copy so a wrapping scroll has no blank gap at the seam.
-        if (isSel && w > Draw::W) {
-            Draw::blitClipped(buf, labelBuf, w, h,
-                              (int16_t)(xOff + w + GAP_PX), rowY, rowY, BAND_HEIGHT);
+        if (isSel) {
+            Draw::stencilClipped(buf, labelBuf, w, h, xOff, rowY, rowY, BAND_HEIGHT,
+                                 0, 0, 0);
+            // Second copy so a wrapping scroll has no blank gap at the seam.
+            if (w > Draw::W) {
+                Draw::stencilClipped(buf, labelBuf, w, h,
+                                     (int16_t)(xOff + w + GAP_PX), rowY,
+                                     rowY, BAND_HEIGHT, 0, 0, 0);
+            }
+        } else {
+            Draw::blitClipped(buf, labelBuf, w, h, xOff, rowY, rowY, BAND_HEIGHT);
         }
     }
 

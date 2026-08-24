@@ -1,15 +1,16 @@
 // Leddite V2 — Boot Menu + Multi-Mode Firmware
 //
 // Modes (selected via rotary encoder boot menu):
-//   CK  Clock + Calendar  — NTP time (ET) alternating with date marquee
+//   CK  Clock + Cal + Wx  — NTP time (ET), date marquee, current conditions
 //   NT  Network Canvas    — existing WebSocket binary protocol (unchanged)
-//   PT  Pattern Slideshow — rainbow, lava lamp, pulse, sparkle
 //   TM  Visual Timer      — rotary encoder sets minutes, progress bar countdown
-//   OC  Octopus Dance     — animated chibi octopus; encoder cycles colour style
+//   OC  Characters        — animated character; encoder cycles colour style
+//   GM  Game Screensavers — auto-playing snake / life / invaders / dino
+//   ST  Settings          — brightness, weather place, temperature units
 //
 // Encoder: CLK=32, DT=33, SW=25
 //   Menu:    turn = navigate, press = select
-//   CK/PT:   press = back to menu
+//   CK:      press = advance face; long-press = back to menu
 //   TM:      turn = adjust minutes / press = start/cancel / press when done = menu
 //   OC:      turn = next style, press = next style (both cycle); long-press = menu
 //   NT:      encoder events broadcast as JSON to connected clients
@@ -38,7 +39,6 @@
 #include "EncoderInput.h"
 #include "MenuMode.h"
 #include "TimeMode.h"
-#include "PatternMode.h"
 #include "TimerMode.h"
 #include "NetworkMode.h"
 #include "OctopusMode.h"
@@ -67,7 +67,6 @@ UiMode        uiMode;
 WeatherClient weatherClient;
 MenuMode      menuMode;
 TimeMode     timeMode;
-PatternMode  patternMode;
 TimerMode    timerMode;
 NetworkMode  networkMode;
 OctopusMode  octopusMode;
@@ -268,10 +267,6 @@ void loop() {
                             BrightnessModel::levelToFastLED(uiMode.brightnessLevel()));
                         canvas.clear();
                         break;
-                    case AppMode::PATTERN:
-                        Serial.println("[Menu] → Pattern Slideshow");
-                        patternMode.begin(canvas);
-                        break;
                     case AppMode::TIMER:
                         Serial.println("[Menu] → Visual Timer");
                         timerMode.begin(canvas);
@@ -304,16 +299,6 @@ void loop() {
                 timeMode.toggleDisplay(canvas, marquee);
             }
             timeMode.update(canvas, marquee);
-            break;
-
-        // ── PATTERN SLIDESHOW ─────────────────────────────────────────────────
-        case AppMode::PATTERN:
-            // Short press OR turn: advance to next pattern
-            if (ev.pressed || ev.delta) {
-                patternMode.nextPattern();
-                Serial.println("[Pattern] Next");
-            }
-            patternMode.update(canvas);
             break;
 
         // ── VISUAL TIMER ──────────────────────────────────────────────────────

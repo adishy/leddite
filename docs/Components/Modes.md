@@ -1,6 +1,6 @@
 # Modes
 
-**Role:** The five application modes selectable from the boot menu, plus the OFF pseudo-mode.
+**Role:** The six application modes selectable from the boot menu, plus the OFF pseudo-mode.
 
 All modes are C++ classes in `esp32_firmware/`.  The main loop in
 `esp32_firmware.ino` dispatches encoder events and calls `update()` on the
@@ -12,13 +12,12 @@ active mode every iteration, then calls `updateDisplay()` to push the shared
 ```cpp
 enum class AppMode {
     MENU,       // Boot menu — navigate with encoder, press to select
-    CLOCK_CAL,  // Clock + Calendar
+    CLOCK_CAL,  // Clock + Calendar + Weather
     NETWORK,    // Network Canvas (WebSocket binary API)
-    PATTERN,    // Pattern Slideshow
     TIMER,      // Visual Timer
-    OCTOPUS,
-    GAMES,
-    SETTINGS,    // Characters — animated ghost, press cycles colour style
+    OCTOPUS,    // Characters — animated ghost, press cycles colour style
+    GAMES,      // Game Screensavers — auto-playing snake / life / invaders / dino
+    SETTINGS,   // Settings — brightness, weather place, temperature units
     OFF,        // Screen blank — short press wakes
 };
 ```
@@ -30,15 +29,16 @@ enum class AppMode {
 Displayed immediately after WiFi + NTP init.
 
 - **Display:** Full mode name scrolls left via `MarqueeEngine` (18 px/s).
-  Five indicator dots at y=14, x=2/5/8/11/14 in per-mode accent colors.
+  Six indicator dots at y=14, x=3/5/7/9/11/13 in per-mode accent colors.
 - **Colors:**
   | Mode | Label | Color | RGB |
   |------|-------|-------|-----|
-  | CK | Clock+Cal | Golden amber | {255,200,80} |
+  | CK | Clock+Cal+Weather | Golden amber | {255,200,80} |
   | NT | Network | Warm orange | {255,130,40} |
-  | PT | Pattern | Coral rose | {255,90,90} |
   | TM | Timer | Warm yellow | {255,230,100} |
   | OC | Characters | Ocean teal | {40,220,210} |
+  | GS | Game Screensavers | Arcade green | {130,230,120} |
+  | ST | Settings | Soft violet | {190,150,255} |
 - **Encoder:** Turn → cycle modes; Press → enter mode.
 - **Long press (3 s):** Screen off (`AppMode::OFF`).
 - **Wake from OFF:** Short press → back to menu.
@@ -98,23 +98,6 @@ await client.listen_encoder(my_callback)
 
 ### Returning to menu
 Long press (3 s) → back to boot menu.
-
----
-
-## Pattern Slideshow (`PatternMode`)
-
-Four self-contained patterns cycling automatically.
-
-| # | Name | Description |
-|---|------|-------------|
-| 0 | Rainbow Wave | Per-pixel HSV hue from x/y/time, 30 FPS |
-| 1 | Lava Lamp | Two oscillating color blobs, distance-based brightness |
-| 2 | Pulse | Full-canvas hue 160 (teal) pulsing via `sin8` |
-| 3 | Sparkle | Random white sparks decaying over dark blue background |
-
-- **Auto-advance:** 15 s per pattern.
-- **Encoder turn or short press:** Skip to next pattern immediately.
-- **Long press (3 s):** Back to menu.
 
 ---
 
@@ -204,11 +187,17 @@ Three visible rows of `SmallTextRenderer`'s 3×4 font (`ListMenu`):
  y    15   position bar — proportional thumb, tracks the selection
 ```
 
-The selected row carries a band in the item's accent colour with bright text on
-top; unselected rows are dim and clipped. Only the selected row scrolls, and only
-if its label exceeds 16px — after a 1.2 s dwell so the opening characters are
-readable. At a 4px advance per character, labels of 4 characters or fewer never
-scroll.
+The selected row carries a band in the item's accent colour at full strength with
+its label **knocked out in black**; unselected rows are dim coloured text on
+black, clipped to their own band. Black text needs `Draw::stencilClipped()` —
+`Draw::blit()` treats pure black as transparent, so a black glyph passed through
+it simply disappears and the band becomes a solid bar. `ListMenu::bandColor()`
+lifts any accent whose brightest channel falls below `BAND_MIN_PEAK` (140),
+preserving its hue, so a dim palette can never leave black-on-black.
+
+Only the selected row scrolls, and only if its label exceeds 16px — after a 1.2 s
+dwell so the opening characters are readable. At a 4px advance per character,
+labels of 4 characters or fewer never scroll.
 
 | Entry | Width | Scrolls |
 |-------|-------|---------|
@@ -253,7 +242,8 @@ Same `ListMenu` presentation. Values apply live and are persisted to NVS
 
 ### Brightness and power
 
-Levels map through an explicit table to FastLED brightness 20–200. Level 10 is
+Levels map through an explicit table to FastLED brightness 6–200, spaced tightly
+at the dim end because perceived brightness is roughly logarithmic. Level 10 is
 deliberately not 255: 256 WS2812B pixels at full white draw roughly 15 A.
 
 | Level | FastLED | Worst case (all white) |
@@ -280,32 +270,50 @@ task because a blocking HTTPS call on the main loop would freeze the display.
   ceiling on failure. Refreshing on view entry would be ~8,600 requests/day since
   the views rotate every 10 s — the cached reading is served instead.
 - **Rendering:** `src/WeatherView`, which takes a plain struct and does no
-  networking, so icon selection, unit conversion and layout are all unit-tested.
+  networking, so wording, colour, unit conversion and layout are all unit-tested.
 
-### Icons
+### Words, not icons
 
-Eleven procedurally drawn shapes cover ~25 WMO codes. Intensity becomes the
-number of precipitation streaks rather than separate icons, and freezing variants
-are a palette swap.
+The view used to draw eleven procedural icons across rows 0–9. At 16×16 those
+shapes were ambiguous — "partly cloudy" and "overcast" differed by a couple of
+pixels — and they cost the whole top half of the panel. `WeatherView::describe()`
+now maps each WMO code to plain uppercase wording instead, which is unambiguous
+and freed the space that pays for the large font.
 
-| Icon | WMO codes |
-|------|-----------|
-| `CLEAR_DAY` / `CLEAR_NIGHT` | 0, 1 (by `is_day`) |
-| `PARTLY_DAY` / `PARTLY_NIGHT` | 2 |
-| `CLOUDY` | 3 |
-| `FOG` | 45, 48 |
-| `DRIZZLE` | 51–57 |
-| `RAIN` | 61–67, 80–82 |
-| `SNOW` | 71–77, 85, 86 |
-| `THUNDER` | 95, 96, 99 |
-| `UNKNOWN` | anything else, **and the fetch-failure state** |
+| WMO codes | Reads as |
+|-----------|----------|
+| 0 | `CLEAR SKY` / `CLEAR NIGHT` (by `is_day`) |
+| 1, 2, 3 | `MAINLY CLEAR`, `PARTLY CLOUDY`, `OVERCAST` |
+| 45, 48 | `FOG`, `FREEZING FOG` |
+| 51–57 | `LIGHT DRIZZLE` … `FREEZING DRIZZLE` |
+| 61–67 | `LIGHT RAIN` … `FREEZING RAIN` |
+| 71–77 | `LIGHT SNOW` … `SNOW GRAINS` |
+| 80–86 | `LIGHT SHOWERS` … `SNOW SHOWERS` |
+| 95–99 | `THUNDERSTORM`, `THUNDER AND HAIL`, `SEVERE THUNDERSTORM` |
+| anything else | `UNKNOWN` |
+| **fetch failed** | `NO DATA`, in neutral grey |
 
-`UNKNOWN` doubling as the failure state is deliberate: a failed fetch must never
-render as though it were a live reading.
+`NO DATA` is a separate state from any code, not a fallback to code 0: a failed
+fetch must never render as though it were a live clear-sky reading.
+
+`conditionColor()` tints the temperature, the rule and the description from one
+palette — warm for sun, blue for rain, near-white for snow, icy cyan for
+freezing, grey for fog — so the whole panel reads as a single state.
 
 ### Layout
 
-Icon on rows 0–9, temperature on rows 11–14. The place code flashes for 2 s on
-entry. There is **no degree symbol** — at a 4px advance `-12*C` is 18px and would
-scroll on a 16px row. Without it every realistic reading fits, with `-40C` and
-`-60C` landing at exactly 16px.
+| Rows | Content |
+|------|---------|
+| 0–3 | Temperature, small 3×4 font, centred |
+| 5 | 1px rule in the condition colour |
+| 8–14 | Condition description, large 5×7 font, scrolling |
+
+The place code flashes for 2 s on entry. The description scrolls after a 900 ms
+dwell and wraps with an 8px gap, drawn twice so the seam is never blank.
+
+The **degree mark** is `*`, since `SmallTextRenderer` has no ASCII degree glyph.
+`18*C` is 14px and fits, but `-12*C` and `212*F` are 18px. The temperature row
+has no scroll fallback by design — the reading must be legible at a glance — so
+`formatTemp()` sheds the **unit letter** rather than the degree when the full
+string will not fit, giving `-12*`. The unit is a user setting shown elsewhere in
+the UI; the degree is what makes the number a temperature.

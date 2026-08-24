@@ -1,15 +1,21 @@
 #include "WeatherView.h"
 #include "Draw.h"
 #include "SmallTextRenderer.h"
+#include "TextRenderer.h"
 #include <stdio.h>
 #include <string.h>
 
-// Scratch for one rendered string. Sized in PIXELS, not characters — the render
-// buffer is textWidth * CHAR_HEIGHT * 3 bytes, and SmallTextRenderer advances up
-// to 4px per character. 32px covers any label this view draws with room to
-// spare; every call still guards on textWidth() before rendering.
+// Scratch for the small-font strings (place code, temperature). Sized in PIXELS,
+// not characters — the render buffer is textWidth * CHAR_HEIGHT * 3 bytes, and
+// SmallTextRenderer advances up to 4px per character. Every call still guards on
+// textWidth() before rendering.
 static const uint16_t TXT_MAX_W = 32;
 static uint8_t        txtBuf[TXT_MAX_W * SmallTextRenderer::CHAR_HEIGHT * 3];
+
+// Scratch for the large-font description. TextRenderer's stride is a fixed 6px
+// per character, so DESC_MAX_CHARS bounds this exactly.
+static const uint16_t DESC_MAX_W = WeatherView::DESC_MAX_CHARS * TextRenderer::CHAR_STRIDE;
+static uint8_t        descBuf[DESC_MAX_W * TextRenderer::CHAR_HEIGHT * 3];
 
 // ── WMO code mapping ──────────────────────────────────────────────────────────
 //
@@ -23,36 +29,94 @@ static uint8_t        txtBuf[TXT_MAX_W * SmallTextRenderer::CHAR_HEIGHT * 3];
 //   80-82    rain showers
 //   85,86    snow showers
 //   95-99    thunderstorm (96,99 with hail)
+//
+// Wording is uppercase and uses only glyphs TextRenderer has (A-Z, 0-9, space
+// and a little punctuation); anything outside that renders as a space. Intensity
+// variants collapse where the distinction would not survive being read off a
+// scrolling 16px strip — "heavy freezing drizzle" is just "FREEZING DRIZZLE".
 
-WeatherView::Icon WeatherView::iconFor(uint8_t wmoCode, bool isDay) {
+const char* WeatherView::describe(uint8_t wmoCode, bool isDay) {
+    switch (wmoCode) {
+        case 0:  return isDay ? "CLEAR SKY" : "CLEAR NIGHT";
+        case 1:  return "MAINLY CLEAR";
+        case 2:  return "PARTLY CLOUDY";
+        case 3:  return "OVERCAST";
+
+        case 45: return "FOG";
+        case 48: return "FREEZING FOG";
+
+        case 51: return "LIGHT DRIZZLE";
+        case 53: return "DRIZZLE";
+        case 55: return "HEAVY DRIZZLE";
+        case 56:
+        case 57: return "FREEZING DRIZZLE";
+
+        case 61: return "LIGHT RAIN";
+        case 63: return "RAIN";
+        case 65: return "HEAVY RAIN";
+        case 66:
+        case 67: return "FREEZING RAIN";
+
+        case 71: return "LIGHT SNOW";
+        case 73: return "SNOW";
+        case 75: return "HEAVY SNOW";
+        case 77: return "SNOW GRAINS";
+
+        case 80: return "LIGHT SHOWERS";
+        case 81: return "RAIN SHOWERS";
+        case 82: return "HEAVY SHOWERS";
+
+        case 85: return "LIGHT SNOW SHOWERS";
+        case 86: return "SNOW SHOWERS";
+
+        case 95: return "THUNDERSTORM";
+        case 96: return "THUNDER AND HAIL";
+        case 99: return "SEVERE THUNDERSTORM";
+
+        default: return "UNKNOWN";
+    }
+}
+
+void WeatherView::conditionColor(uint8_t wmoCode, bool isDay,
+                                 uint8_t& r, uint8_t& g, uint8_t& b) {
+    // Warm for sun, cool blue as precipitation gets heavier, near-white for
+    // snow, flat grey for fog. Freezing codes borrow the icy cyan so a freezing
+    // reading never looks like ordinary rain.
     switch (wmoCode) {
         case 0:
-        case 1:  return isDay ? CLEAR_DAY  : CLEAR_NIGHT;
-        case 2:  return isDay ? PARTLY_DAY : PARTLY_NIGHT;
-        case 3:  return CLOUDY;
-        case 45:
-        case 48: return FOG;
+            if (isDay) { r = 255; g = 190; b =  40; }   // sun
+            else       { r = 150; g = 175; b = 255; }   // moonlight
+            return;
+        case 1:
+            if (isDay) { r = 255; g = 210; b = 110; }
+            else       { r = 165; g = 185; b = 240; }
+            return;
+        case 2:
+            if (isDay) { r = 230; g = 205; b = 150; }
+            else       { r = 160; g = 175; b = 215; }
+            return;
+        case 3:  r = 165; g = 175; b = 195; return;     // overcast
+
+        case 45: r = 150; g = 160; b = 170; return;     // fog
+        case 48: r = 165; g = 205; b = 225; return;     // freezing fog
+
+        case 71: case 73: case 75: case 77:
+        case 85: case 86:
+            r = 225; g = 240; b = 255; return;          // snow
+
+        case 95: case 96: case 99:
+            r = 255; g = 205; b =  70; return;          // thunder
+
         default: break;
     }
 
-    if (wmoCode >= 51 && wmoCode <= 57) return DRIZZLE;
-    if (wmoCode >= 61 && wmoCode <= 67) return RAIN;
-    if (wmoCode >= 71 && wmoCode <= 77) return SNOW;
-    if (wmoCode >= 80 && wmoCode <= 82) return RAIN;
-    if (wmoCode == 85 || wmoCode == 86) return SNOW;
-    if (wmoCode >= 95 && wmoCode <= 99) return THUNDER;
+    if (isFreezing(wmoCode)) { r = 160; g = 235; b = 255; return; }
 
-    return UNKNOWN;
-}
+    if (wmoCode >= 51 && wmoCode <= 57) { r = 110; g = 190; b = 240; return; }  // drizzle
+    if (wmoCode >= 61 && wmoCode <= 67) { r =  80; g = 150; b = 255; return; }  // rain
+    if (wmoCode >= 80 && wmoCode <= 82) { r =  70; g = 165; b = 245; return; }  // showers
 
-uint8_t WeatherView::precipStreaks(uint8_t wmoCode) {
-    switch (wmoCode) {
-        // Slight
-        case 51: case 56: case 61: case 66: case 71: case 80: case 85: return 2;
-        // Heavy / violent
-        case 55: case 57: case 65: case 67: case 75: case 82: case 86: return 4;
-        default: return 3;   // moderate, and anything unclassified
-    }
+    r = 120; g = 120; b = 130;                                                 // unknown
 }
 
 bool WeatherView::isFreezing(uint8_t wmoCode) {
@@ -72,166 +136,36 @@ int16_t WeatherView::displayTemp(int16_t tempC10, TempUnit unit) {
 
 void WeatherView::formatTemp(int16_t tempC10, TempUnit unit, char* out, size_t n) {
     if (!out || n == 0) return;
+
     const int16_t t = displayTemp(tempC10, unit);
-    snprintf(out, n, "%d%c", (int)t, unit == TempUnit::FAHRENHEIT ? 'F' : 'C');
+    const char    u = (unit == TempUnit::FAHRENHEIT) ? 'F' : 'C';
+
+    snprintf(out, n, "%d%c%c", (int)t, SmallTextRenderer::DEGREE_CHAR, u);
+
+    // "-12*C" and "212*F" are 18px in a 16px row. The temperature row has no
+    // scroll fallback by design, so shed the unit letter — which the user chose
+    // and which the rest of the UI already shows — before the degree mark.
+    if (SmallTextRenderer::textWidth(out) > Draw::W)
+        snprintf(out, n, "%d%c", (int)t, SmallTextRenderer::DEGREE_CHAR);
 }
 
-// ── Primitives ────────────────────────────────────────────────────────────────
-//
-// Coordinates are in tenths of a pixel so discs can be centred between pixels,
-// which matters a lot when a "circle" is only four pixels across.
+// ── Description scrolling ─────────────────────────────────────────────────────
 
-void WeatherView::disc(uint8_t* buf, int16_t cx10, int16_t cy10, int16_t r10,
-                       uint8_t r, uint8_t g, uint8_t b) {
-    const int32_t rr = (int32_t)r10 * r10;
-    for (int16_t y = 0; y < 10; y++) {
-        for (int16_t x = 0; x < 16; x++) {
-            const int32_t dx = (int32_t)(x * 10 + 5) - cx10;
-            const int32_t dy = (int32_t)(y * 10 + 5) - cy10;
-            if (dx * dx + dy * dy <= rr) Draw::px(buf, x, y, r, g, b);
-        }
-    }
-}
+int16_t WeatherView::descScrollOffset(uint16_t descW, uint32_t elapsedMs) {
+    if (descW <= Draw::W) return 0;             // fits: never scrolls
 
-void WeatherView::cloud(uint8_t* buf, int16_t yOff, uint8_t r, uint8_t g, uint8_t b) {
-    // Three overlapping lobes plus a flat base reads as a cloud at this size.
-    disc(buf, 55, (int16_t)(yOff + 45), 22, r, g, b);
-    disc(buf, 85, (int16_t)(yOff + 33), 27, r, g, b);
-    disc(buf, 112, (int16_t)(yOff + 47), 21, r, g, b);
-    Draw::rect(buf, 3, (int16_t)(yOff / 10 + 5), 10, 2, r, g, b);
-}
+    // Scrolling is timed from the moment the description takes over the panel,
+    // not from view entry, so the dwell is not eaten by the place-code flash.
+    // Callers may pass no place code, in which case there is no flash and
+    // elapsedMs can be below PLACE_FLASH_MS — clamp rather than underflow.
+    const uint32_t since = (elapsedMs > PLACE_FLASH_MS)
+                         ? (elapsedMs - PLACE_FLASH_MS) : 0u;
+    if (since <= DESC_DWELL_MS) return 0;
 
-void WeatherView::sun(uint8_t* buf, int16_t cx, int16_t cy, bool rays) {
-    disc(buf, (int16_t)(cx * 10 + 5), (int16_t)(cy * 10 + 5), 25, 255, 190, 20);
-    disc(buf, (int16_t)(cx * 10 + 5), (int16_t)(cy * 10 + 5), 13, 255, 235, 120);
+    const uint32_t travel = (uint32_t)descW + DESC_GAP_PX;
+    const uint32_t moved  = ((since - DESC_DWELL_MS) * DESC_PPS) / 1000u;
 
-    if (!rays) return;
-    static const int8_t RX[8] = { 0,  0, -4, 4, -3,  3, -3, 3 };
-    static const int8_t RY[8] = {-4,  4,  0, 0, -3, -3,  3, 3 };
-    for (uint8_t i = 0; i < 8; i++)
-        Draw::px(buf, (int16_t)(cx + RX[i]), (int16_t)(cy + RY[i]), 255, 200, 40);
-}
-
-void WeatherView::moon(uint8_t* buf, int16_t cx, int16_t cy) {
-    // Crescent: a bright disc with a background-coloured disc bitten out of it.
-    // The bite is offset up and right by a little over one pixel and is only
-    // slightly smaller than the disc — biting harder than this leaves a sliver
-    // that reads as noise rather than as a moon at 16x16.
-    disc(buf, (int16_t)(cx * 10 + 5), (int16_t)(cy * 10 + 5), 34, 225, 230, 255);
-    disc(buf, (int16_t)(cx * 10 + 19), (int16_t)(cy * 10 - 4), 30, 0, 0, 0);
-    Draw::px(buf, (int16_t)(cx + 5), (int16_t)(cy - 2), 200, 210, 255);   // star
-}
-
-// A narrower cloud for the "partly" icons, so the sun or moon behind it stays
-// visible. The full-width cloud() occludes almost the entire 16px row.
-void WeatherView::cloudSmall(uint8_t* buf, int16_t yOff,
-                             uint8_t r, uint8_t g, uint8_t b) {
-    disc(buf, 35, (int16_t)(yOff + 45), 20, r, g, b);
-    disc(buf, 62, (int16_t)(yOff + 35), 24, r, g, b);
-    disc(buf, 88, (int16_t)(yOff + 46), 19, r, g, b);
-    Draw::rect(buf, 1, (int16_t)(yOff / 10 + 5), 9, 2, r, g, b);
-}
-
-// ── Icon rendering ────────────────────────────────────────────────────────────
-
-void WeatherView::drawIcon(uint8_t* buf, Icon icon, uint8_t streaks,
-                           bool freezing, uint32_t elapsedMs) {
-    const uint8_t CR = 168, CG = 178, CB = 196;          // cloud body
-    const uint8_t DR = 96,  DG = 104, DB = 122;          // shaded cloud
-
-    // Precipitation scrolls downward; the phase also drives the lightning flash.
-    const uint8_t phase = (uint8_t)((elapsedMs / 160u) % 3u);
-
-    switch (icon) {
-        case CLEAR_DAY:
-            sun(buf, 7, 4, true);
-            break;
-
-        case CLEAR_NIGHT:
-            moon(buf, 7, 4);
-            break;
-
-        case PARTLY_DAY:
-            // Sun tucked into the top-right, cloud drawn after so it overlaps.
-            sun(buf, 12, 2, false);
-            cloudSmall(buf, 14, CR, CG, CB);
-            break;
-
-        case PARTLY_NIGHT:
-            moon(buf, 12, 2);
-            cloudSmall(buf, 14, CR, CG, CB);
-            break;
-
-        case CLOUDY:
-            cloud(buf, 16, DR, DG, DB);
-            cloud(buf, 4, CR, CG, CB);
-            break;
-
-        case FOG:
-            // Offset bars, drifting sideways, read as fog better than a cloud.
-            for (uint8_t i = 0; i < 4; i++) {
-                const int16_t y = (int16_t)(2 + i * 2);
-                const int16_t x = (int16_t)(((i % 2) ? 1 : 3) +
-                                            ((elapsedMs / 400u + i) % 3u));
-                Draw::rect(buf, x, y, 11, 1, CR, CG, CB);
-            }
-            break;
-
-        case DRIZZLE:
-        case RAIN: {
-            cloud(buf, 0, CR, CG, CB);
-            const uint8_t pr = freezing ? 190 : 90;
-            const uint8_t pg = freezing ? 240 : 170;
-            const uint8_t pb = 255;
-            const uint8_t len = (icon == RAIN) ? 2 : 1;
-            for (uint8_t s = 0; s < streaks; s++) {
-                const int16_t x = (int16_t)(3 + s * 3);
-                const int16_t y = (int16_t)(7 + ((phase + s) % 3));
-                for (uint8_t k = 0; k < len; k++)
-                    Draw::px(buf, x, (int16_t)(y + k), pr, pg, pb);
-            }
-            break;
-        }
-
-        case SNOW: {
-            cloud(buf, 0, CR, CG, CB);
-            for (uint8_t s = 0; s < streaks; s++) {
-                const int16_t x = (int16_t)(3 + s * 3);
-                const int16_t y = (int16_t)(7 + ((phase + s) % 3));
-                Draw::px(buf, x, y, 235, 245, 255);
-            }
-            break;
-        }
-
-        case THUNDER: {
-            cloud(buf, 0, DR, DG, DB);
-            // Bolt flashes rather than sitting static.
-            const bool flash = (phase != 2);
-            const uint8_t br = flash ? 255 : 150;
-            const uint8_t bg = flash ? 225 : 120;
-            const uint8_t bb = flash ? 60  : 30;
-            Draw::px(buf, 8, 6, br, bg, bb);
-            Draw::px(buf, 7, 7, br, bg, bb);
-            Draw::px(buf, 8, 7, br, bg, bb);
-            Draw::px(buf, 6, 8, br, bg, bb);
-            Draw::px(buf, 7, 8, br, bg, bb);
-            Draw::px(buf, 7, 9, br, bg, bb);
-            break;
-        }
-
-        case UNKNOWN:
-        default: {
-            // Doubles as the fetch-failure state: a stale reading must never be
-            // presented as if it were live.
-            const uint8_t q[3] = { 120, 120, 130 };
-            uint16_t w = 0, h = 0;
-            SmallTextRenderer::renderText("-", txtBuf, w, h, q);
-            Draw::blit(buf, txtBuf, w, h, 6, 4);
-            Draw::rect(buf, 4, 2, 8, 1, q[0], q[1], q[2]);
-            Draw::rect(buf, 4, 7, 8, 1, q[0], q[1], q[2]);
-            break;
-        }
-    }
+    return (int16_t)-(int16_t)(moved % travel);
 }
 
 // ── Full view ─────────────────────────────────────────────────────────────────
@@ -240,8 +174,6 @@ void WeatherView::render(uint8_t* buf, const WeatherData& d, TempUnit unit,
                          const char* placeCode, uint32_t elapsedMs) {
     Draw::clear(buf);
 
-    const Icon icon = d.valid ? iconFor(d.wmoCode, d.isDay) : UNKNOWN;
-
     // Place code takes over the whole panel briefly on entry, so it is always
     // unambiguous which location is being shown.
     if (placeCode && elapsedMs < PLACE_FLASH_MS) {
@@ -249,22 +181,70 @@ void WeatherView::render(uint8_t* buf, const WeatherData& d, TempUnit unit,
         uint16_t w = 0, h = 0;
         if (SmallTextRenderer::textWidth(placeCode) <= TXT_MAX_W) {
             SmallTextRenderer::renderText(placeCode, txtBuf, w, h, c);
-            Draw::blit(buf, txtBuf, w, h, (int16_t)((16 - (int16_t)w) / 2), 6);
+            Draw::blit(buf, txtBuf, w, h, (int16_t)((Draw::W - (int16_t)w) / 2), 6);
         }
         return;
     }
 
-    drawIcon(buf, icon, precipStreaks(d.wmoCode), isFreezing(d.wmoCode), elapsedMs);
+    // A failed or absent fetch must never be presented as a real reading, so it
+    // gets its own wording and the neutral unknown colour rather than defaulting
+    // to code 0 (which is "clear sky").
+    uint8_t cr, cg, cb;
+    const char* desc;
+    if (d.valid) {
+        conditionColor(d.wmoCode, d.isDay, cr, cg, cb);
+        desc = describe(d.wmoCode, d.isDay);
+    } else {
+        cr = 120; cg = 120; cb = 130;
+        desc = "NO DATA";
+    }
 
     // ── Temperature ───────────────────────────────────────────────────────────
-    char tmp[8];
-    if (d.valid) formatTemp(d.tempC10, unit, tmp, sizeof(tmp));
-    else         snprintf(tmp, sizeof(tmp), "--%c", unit == TempUnit::FAHRENHEIT ? 'F' : 'C');
+    // Lifted toward white so it reads as the headline while still carrying the
+    // condition's hue.
+    const uint8_t tc[3] = {
+        (uint8_t)(cr + ((255 - cr) * 2) / 5),
+        (uint8_t)(cg + ((255 - cg) * 2) / 5),
+        (uint8_t)(cb + ((255 - cb) * 2) / 5),
+    };
 
-    const uint8_t tc[3] = { 255, 240, 210 };
+    char tmp[10];
+    if (d.valid) {
+        formatTemp(d.tempC10, unit, tmp, sizeof(tmp));
+    } else {
+        snprintf(tmp, sizeof(tmp), "--%c%c", SmallTextRenderer::DEGREE_CHAR,
+                 unit == TempUnit::FAHRENHEIT ? 'F' : 'C');
+    }
+
     uint16_t w = 0, h = 0;
     if (SmallTextRenderer::textWidth(tmp) <= TXT_MAX_W) {
         SmallTextRenderer::renderText(tmp, txtBuf, w, h, tc);
-        Draw::blit(buf, txtBuf, w, h, (int16_t)((16 - (int16_t)w) / 2), 11);
+        Draw::blit(buf, txtBuf, w, h, (int16_t)((Draw::W - (int16_t)w) / 2), TEMP_Y);
+    }
+
+    // ── Rule ──────────────────────────────────────────────────────────────────
+    Draw::rect(buf, 0, RULE_Y, Draw::W, 1,
+               Draw::dim(cr, 110), Draw::dim(cg, 110), Draw::dim(cb, 110));
+
+    // ── Description ───────────────────────────────────────────────────────────
+    if (TextRenderer::textWidth(desc) > DESC_MAX_W) return;   // guarded by a test
+
+    const uint8_t dc[3] = { cr, cg, cb };
+    uint16_t dw = 0, dh = 0;
+    TextRenderer::renderText(desc, descBuf, dw, dh, dc);
+    if (dw == 0) return;
+
+    const int16_t xOff = (dw <= Draw::W)
+                       ? (int16_t)((Draw::W - (int16_t)dw) / 2)   // short: centred
+                       : descScrollOffset(dw, elapsedMs);
+
+    Draw::blitClipped(buf, descBuf, dw, dh, xOff, DESC_Y,
+                      DESC_Y, TextRenderer::CHAR_HEIGHT);
+
+    // Second copy so a wrapping scroll has no blank gap at the seam.
+    if (dw > Draw::W) {
+        Draw::blitClipped(buf, descBuf, dw, dh,
+                          (int16_t)(xOff + dw + DESC_GAP_PX), DESC_Y,
+                          DESC_Y, TextRenderer::CHAR_HEIGHT);
     }
 }

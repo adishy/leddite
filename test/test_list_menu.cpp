@@ -147,6 +147,63 @@ void test_position_bar_present_and_moves() {
     PASS();
 }
 
+void test_selected_label_is_black_on_the_band() {
+    TEST("the selected row knocks its label out in black");
+    // Draw::blit treats black as transparent, so this only works via
+    // Draw::stencilClipped. If it ever regresses to blit the glyph simply
+    // disappears and the band becomes a solid bar — which is what this catches.
+    ListMenu m;
+    m.begin(FIVE, 5, 0, 0);      // "SNAKE" — 20px, wider than the panel
+    m.render(buf, 0);
+
+    uint16_t black = 0, lit = 0;
+    for (uint8_t x = 0; x < 16; x++)
+        for (uint8_t y = 0; y < ListMenu::BAND_HEIGHT; y++)
+            (pixLit(x, y) ? lit : black)++;
+
+    ASSERT(black > 0, "no black glyph pixels — the label was not knocked out");
+    ASSERT(lit   > 0, "no band pixels — the highlight is missing");
+    PASS();
+}
+
+void test_band_is_bright_enough_for_black_text() {
+    TEST("a dark accent is lifted so black text still reads");
+    // Callers pick their own palettes; a dim accent would leave black-on-black.
+    static const MenuItem DARK[] = {
+        {"DIM",  20, 10, 5},
+        {"BLK",   0,  0, 0},
+        {"OK",  255, 90, 90},
+    };
+    for (uint8_t i = 0; i < 3; i++) {
+        uint8_t r, g, b;
+        ListMenu::bandColor(DARK[i], r, g, b);
+        uint8_t peak = r; if (g > peak) peak = g; if (b > peak) peak = b;
+        ASSERT(peak >= ListMenu::BAND_MIN_PEAK, "band too dark for black text");
+    }
+
+    // A lifted accent keeps its hue — a red accent must not turn grey.
+    uint8_t r, g, b;
+    ListMenu::bandColor(DARK[0], r, g, b);
+    ASSERT(r > g && g > b, "lifting the accent lost its hue");
+    PASS();
+}
+
+void test_unselected_rows_keep_their_accent() {
+    TEST("unselected rows stay coloured text on black");
+    ListMenu m;
+    m.begin(FIVE, 5, 0, 0);
+    m.render(buf, 0);
+    // Row 1 is "LIFE" (120,200,255) dimmed — blue-dominant, and its far-right
+    // column is background because the label is 16px of mostly-blank advance.
+    bool sawColour = false;
+    for (uint8_t x = 0; x < 16; x++) {
+        const uint16_t i = (uint16_t)((ListMenu::ROW_HEIGHT) * 16 + x) * 3;
+        if (buf[i + 2] > buf[i] && buf[i + 2] > 0) { sawColour = true; break; }
+    }
+    ASSERT(sawColour, "unselected row lost its accent colour");
+    PASS();
+}
+
 void test_rows_do_not_bleed() {
     TEST("row content is clipped to its own band");
     // A 4px glyph in a 5px row leaves row 4 (and 9, 14) as separator gaps.
@@ -220,6 +277,9 @@ int main() {
     test_exactly_one_band();
     test_band_follows_selection();
     test_position_bar_present_and_moves();
+    test_selected_label_is_black_on_the_band();
+    test_band_is_bright_enough_for_black_text();
+    test_unselected_rows_keep_their_accent();
     test_rows_do_not_bleed();
     test_long_label_dwells_then_scrolls();
     test_turn_restarts_dwell();

@@ -14,8 +14,9 @@
 //   y 15      position bar — shows where the selection sits in the full list
 //
 // Rendering rules:
-//   - The selected row gets a full-width band in the item's accent colour
-//     (dimmed to BAND_SCALE) with the label drawn bright on top.
+//   - The selected row gets a full-width band in the item's accent colour with
+//     the label knocked out in BLACK on top, which is what makes the selection
+//     read as a solid highlight rather than as one more coloured row.
 //   - Unselected rows are drawn dim on black and clipped at the row edge.
 //   - Only the selected row scrolls, and only when its label exceeds 16px.
 //     It dwells for DWELL_MS so the first characters are readable, then
@@ -44,8 +45,14 @@ public:
     static const uint16_t DWELL_MS     = 1200;  // pause before a long label scrolls
     static const uint8_t  SCROLL_PPS   = 12;    // scroll speed, px/sec
     static const uint8_t  GAP_PX       = 6;     // gap between wrap repetitions
-    static const uint8_t  BAND_SCALE   = 70;    // selected-row background dim (0-255)
     static const uint8_t  DIM_SCALE    = 90;    // unselected-row text dim (0-255)
+
+    // The band carries the accent colour at full strength: black glyphs need the
+    // background bright to read at all, so the old BAND_SCALE dimming is gone.
+    // BAND_MIN_PEAK is a contrast floor — an item whose accent is too dark to
+    // knock black text out of is scaled up until its brightest channel reaches
+    // this, so the widget stays legible whatever palette a caller passes in.
+    static const uint8_t  BAND_MIN_PEAK = 140;
 
     // `items` must outlive the ListMenu — it is not copied.
     void begin(const MenuItem* items, uint8_t count, uint8_t selected, uint32_t nowMs);
@@ -60,6 +67,10 @@ public:
 
     // Renders into a 16*16*3 buffer (see Draw.h).
     void render(uint8_t* buf, uint32_t nowMs) const;
+
+    // The band colour actually used for an item — its accent, lifted if needed
+    // so black text stays readable. Exposed for tests.
+    static void bandColor(const MenuItem& item, uint8_t& r, uint8_t& g, uint8_t& b);
 
 private:
     // Horizontal offset for a scrolling label at the given elapsed time.

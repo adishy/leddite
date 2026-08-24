@@ -31,8 +31,8 @@ public:
     static uint8_t cos8(uint8_t theta);   // == sin8(theta + 64)
 
     // Signed convenience wrappers: result in [-128, 127].
-    // Equivalent to (int16_t)sin8(theta) - 128, which is the idiom the existing
-    // PatternMode code uses everywhere.
+    // Equivalent to (int16_t)sin8(theta) - 128, the idiom the FastLED-derived
+    // animation code uses for anything that oscillates around an origin.
     static int16_t sin8s(uint8_t theta);
     static int16_t cos8s(uint8_t theta);
 
