@@ -11,7 +11,14 @@ CXXFLAGS = -O3 -Iinclude
 WASM_FLAGS = --bind -s WASM=1 -s ALLOW_MEMORY_GROWTH=1
 
 # Source files
-CORE_SRCS = src/Canvas.cpp src/Transformer.cpp src/MarqueeEngine.cpp src/ProtocolHandler.cpp src/TextRenderer.cpp
+# PROTOCOL_SRCS: the original binary-protocol core.
+# MODE_SRCS:     Arduino-free mode logic (see docs/adr/0001) — games, menus,
+#                settings and weather. Unit-tested natively and compiled into
+#                the WASM module so the simulator runs the same code as the ESP32.
+PROTOCOL_SRCS = src/Canvas.cpp src/Transformer.cpp src/MarqueeEngine.cpp src/ProtocolHandler.cpp src/TextRenderer.cpp
+MODE_SRCS     = src/ColorUtils.cpp src/Draw.cpp src/SmallTextRenderer.cpp src/ListMenu.cpp \
+                src/GameEngine.cpp src/BrightnessModel.cpp src/WeatherView.cpp src/Places.cpp
+CORE_SRCS     = $(PROTOCOL_SRCS) $(MODE_SRCS)
 WASM_BRIDGE = simulator/wasm_bridge.cpp
 SIM_DIR = simulator
 
