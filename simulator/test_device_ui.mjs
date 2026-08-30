@@ -22,7 +22,8 @@ const S = {
   GAMES_MENU: 0, GAME_PLAYING: 1, SETTINGS_MENU: 2,
   BRIGHTNESS_EDIT: 3, PLACES_MENU: 4, UNITS_EDIT: 5, WEATHER: 6,
 };
-const GAME = { SNAKE: 0, LIFE: 1, INVADERS: 2, DINO: 3 };
+const GAME = { SNAKE: 0, INVADERS: 1, DINO: 2, PONG: 3, BREAKOUT: 4 };
+const GAME_COUNT = 5;   // mirrors Game::COUNT
 
 const WEATHER_STEADY = 5000;   // past WeatherView::PLACE_FLASH_MS
 
@@ -86,8 +87,9 @@ test('games menu renders and wraps', () => {
   ui.turn(1, 0); ui.tick(0);
   check(!same(first, frame(mod, ui)), 'turning did not change the frame');
 
-  // 5 entries: turning 5 times returns to the start.
-  ui.turn(1, 0); ui.turn(1, 0); ui.turn(1, 0); ui.turn(1, 0); ui.tick(0);
+  // GAME_COUNT games + "CYCLE ALL": turning that many times returns to the start.
+  for (let i = 1; i < GAME_COUNT + 1; i++) ui.turn(1, 0);
+  ui.tick(0);
   check(same(first, frame(mod, ui)), 'menu did not wrap after a full cycle');
   ui.delete();
 });
@@ -110,7 +112,7 @@ test('press launches a game, long-press returns to the list', () => {
 
 test('every game renders live pixels through the binding', () => {
   const ui = new mod.DeviceUI();
-  for (let g = 0; g < 4; g++) {
+  for (let g = 0; g < GAME_COUNT; g++) {
     ui.enterGames(0);
     for (let i = 0; i < g; i++) ui.turn(1, 0);
     ui.press(0);
@@ -125,14 +127,15 @@ test('every game renders live pixels through the binding', () => {
 test('CYCLE ALL advances through every game', () => {
   const ui = new mod.DeviceUI();
   ui.enterGames(0);
-  for (let i = 0; i < 4; i++) ui.turn(1, 0);      // land on CYCLE ALL
+  for (let i = 0; i < GAME_COUNT; i++) ui.turn(1, 0);   // land on CYCLE ALL
   ui.press(0);
   check(ui.cycling(), 'cycling flag not set');
 
   const seen = new Set([ui.currentGame()]);
   let t = 0;
-  for (let i = 0; i < 4000; i++) { t += 60; ui.tick(t); seen.add(ui.currentGame()); }
-  eq(seen.size, 4, 'cycle did not visit all four games');
+  // CYCLE_INTERVAL_MS is 20s per game, so a full lap needs GAME_COUNT of them.
+  for (let i = 0; i < 5000; i++) { t += 60; ui.tick(t); seen.add(ui.currentGame()); }
+  eq(seen.size, GAME_COUNT, `cycle did not visit all ${GAME_COUNT} games`);
   ui.delete();
 });
 

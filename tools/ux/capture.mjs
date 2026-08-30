@@ -69,7 +69,7 @@ function run(ui, fromMs, toMs) {
 // colour rather than against whichever one happens to be selected first.
 
 withUI((ui) => {
-  const NAMES = ['SNAKE', 'LIFE', 'INVADERS', 'DINO', 'CYCLE ALL'];
+  const NAMES = ['SNAKE', 'INVADERS', 'DINO', 'PONG', 'BRICKS', 'CYCLE ALL'];
   ui.enterGames(0);
   for (let i = 0; i < NAMES.length; i++) {
     ui.tick(0);
@@ -201,7 +201,7 @@ withUI((ui) => {
 // Sampled well into play, not at frame zero: a game that looks fine on its
 // opening frame can still be visually dead a few seconds later.
 
-const GAMES = ['SNAKE', 'LIFE', 'INVADERS', 'DINO'];
+const GAMES = ['SNAKE', 'INVADERS', 'DINO', 'PONG', 'BRICKS'];
 for (let g = 0; g < GAMES.length; g++) {
   withUI((ui) => {
     ui.enterGames(0);

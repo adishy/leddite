@@ -171,12 +171,16 @@ The main sketch (`esp32_firmware/esp32_firmware.ino`) is a mode dispatcher. Each
 
 - **MenuMode** — boot menu; encoder navigates, press returns `AppMode` enum
 - **TimeMode** — NTP clock (Eastern Time), date, and current weather; cycles every 10 s, DVD-bounces around screen (the weather face does not bounce — it shows the temperature over a scrolling condition description)
-- **TimerMode** — encoder sets minutes 1–90, progress-bar countdown
+- **TimerMode** — "TIMER" in the boot menu; encoder sets minutes 1–90, progress-bar countdown
 - **NetworkMode** — WebSocket server; relays binary packets to `Canvas`, broadcasts encoder JSON
 - **OctopusMode** — animated character (Pac-Man ghost); encoder cycles 5 colour palettes
 - **UiMode** — thin Arduino shell around `src/UiController`, which owns the Games
   and Settings submenu trees. Supplies `millis()`, pushes the rendered buffer to
   `Canvas`, and mirrors brightness/place/unit into NVS via `Preferences`.
+  The games are Snake, Invaders, Dino, Pong and Breakout (`Game` enum order,
+  which `GAME_ITEMS` in `UiController.cpp` must match). Their headline
+  behaviours — the dino never hitting a cactus, Invaders' 0.3 win rate — are
+  explicit invariants with tests, not tuning; see `docs/adr/0013`.
 - **WeatherClient** — Open-Meteo (no API key) on its own FreeRTOS task, so a
   blocking HTTPS call never stalls the display. Fetches every 45 min with
   exponential backoff; always in Celsius, with conversion done at render time so

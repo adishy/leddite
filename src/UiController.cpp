@@ -10,15 +10,17 @@
 // advances 4px per character into a 16px row). Longer ones scroll, which is
 // handled by ListMenu — but keeping the common cases short keeps the list calm.
 
+// Order must match the Game enum: startGame() indexes into it directly.
 static const MenuItem GAME_ITEMS[] = {
     { "SNAKE",      60, 220,  90 },
-    { "LIFE",      120, 200, 255 },
     { "INVADERS",  255,  90,  90 },
-    { "DINO",      240, 200, 120 },
+    { "DINO",      215, 195, 110 },   // desert sand — SNAKE already owns mint
+    { "PONG",      120, 200, 255 },
+    { "BRICKS",    255, 170,  60 },
     { "CYCLE ALL", 200, 120, 255 },
 };
-static const uint8_t GAME_COUNT  = 5;
-static const uint8_t CYCLE_INDEX = 4;   // "CYCLE ALL" is the last entry
+static const uint8_t GAME_COUNT  = 6;
+static const uint8_t CYCLE_INDEX = 5;   // "CYCLE ALL" is the last entry
 
 static const MenuItem SETTINGS_ITEMS[] = {
     { "BRIGHTNESS", 255, 200,  80 },

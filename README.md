@@ -34,9 +34,9 @@ press to select.
 |------|-------|-------------|
 | Clock + Cal + Weather | **CK** | 24-hour clock (HH sky-blue / MM pink) DVD-bouncing once/sec, cycling every 10 s through date (DD orange / MMM green) and current weather (temperature + scrolling condition) |
 | Network Canvas | **NT** | WebSocket binary API (port 81); encoder events broadcast as JSON |
-| Visual Timer | **TM** | Encoder sets minutes (1–90), progress-bar countdown |
+| Timer | **TM** | Encoder sets minutes (1–90), progress-bar countdown |
 | Characters | **OC** | Animated Pac-Man ghost; press cycles 5 colour palettes |
-| Game Screensavers | **GS** | Auto-playing Snake, Game of Life, Space Invaders, Dino Jump, or Cycle All |
+| Game Screensavers | **GS** | Auto-playing Snake, Space Invaders, Dino Jump, Pong, Brick Breaker, or Cycle All |
 | Settings | **ST** | Brightness (1–10), weather place, temperature units — persisted to NVS |
 
 **Universal gestures**

@@ -9,7 +9,7 @@
 // rather than a reimplementation that can drift.
 //
 // SCREENS
-//   GAMES_MENU      list of games + "CYCLE ALL"
+//   GAMES_MENU      list of games (Game enum order) + "CYCLE ALL"
 //   GAME_PLAYING    a game running full-screen
 //   SETTINGS_MENU   BRIGHTNESS / PLACE / UNITS
 //   BRIGHTNESS_EDIT level 1-10

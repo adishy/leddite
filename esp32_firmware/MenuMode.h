@@ -11,7 +11,7 @@
 // Shows full mode names scrolling left-to-right via MarqueeEngine (own instance):
 //   0: "CLOCK CAL WEATHER" (golden amber)
 //   1: "NETWORK CANVAS"    (warm orange)
-//   2: "VISUAL TIMER"      (warm yellow)
+//   2: "TIMER"             (warm yellow)
 //   3: "CHARACTERS"        (ocean teal)
 //   4: "GAME SCREENSAVERS" (arcade green)
 //   5: "SETTINGS"          (soft violet)

@@ -20,6 +20,7 @@ history; each cites the commits it is reconstructed from.
 | [0010](0010-simulator-runs-the-real-state-machine.md) | The simulator runs the real state machine, not a copy | 2026-08-23 | Accepted |
 | [0011](0011-words-not-icons-on-a-16x16-panel.md) | Words, not icons, on a 16x16 panel | 2026-08-24 | Accepted |
 | [0012](0012-unlit-is-the-best-background.md) | Unlit is the best background this panel has | 2026-08-24 | Accepted |
+| [0013](0013-screensaver-games-decide-outcomes-in-advance.md) | Screensaver games decide their outcomes in advance | 2026-08-30 | Accepted |
 
 ## The thread running through these
 
@@ -35,6 +36,7 @@ Most of what followed is buying that back:
 - **0009** — extend 0003 to mode logic, which 0008 had left behind
 - **0010** — extend 0005 so the simulator runs the real state machine rather than a preview of it
 - **0012** — the first decision made from *rendered output* rather than from reasoning about code, which is what 0005 and 0010 were building toward all along
+- **0013** — the first decision to make a game's *visible outcome* an explicit invariant rather than something tuned into existence
 
 The recurring failure mode is **a second implementation of the same thing**:
 `demo_3d_patterns.py` re-porting `PatternMode` to Python (0008), a proposed JS
