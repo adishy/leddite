@@ -2,6 +2,7 @@
 #include "BrightnessModel.h"
 #include <Arduino.h>
 #include <FastLED.h>
+#include <WiFi.h>
 
 // NVS namespace and keys. Keys are <=15 chars (an NVS limit).
 static const char* NVS_NS     = "leddite";
@@ -57,6 +58,12 @@ void UiMode::persistIfDirty() {
                   ui.unit() == TempUnit::FAHRENHEIT ? 'F' : 'C');
 }
 
+void UiMode::refreshNetworkStatus() {
+    if (WiFi.status() != WL_CONNECTED) { ui.setNetworkDown(); return; }
+    const IPAddress a = WiFi.localIP();
+    ui.setIpAddress(a[0], a[1], a[2], a[3]);
+}
+
 // ── Entry points ──────────────────────────────────────────────────────────────
 
 void UiMode::enterGames(Canvas& canvas) {
@@ -80,7 +87,9 @@ void UiMode::enterWeather(Canvas& canvas) {
 // ── Encoder ───────────────────────────────────────────────────────────────────
 
 void UiMode::onEncoderTurn(int delta) {
-    ui.turn(delta, millis());
+    // Raw detents from the ESP32Encoder: encoderTurn() applies the list
+    // inversion and the two-clicks-per-row granularity (docs/adr/0016).
+    ui.encoderTurn(delta, millis());
     // Brightness is applied live so the panel itself previews the level.
     applyBrightness();
     lastFrameMs = 0;

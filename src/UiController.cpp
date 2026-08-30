@@ -2,6 +2,7 @@
 #include "BrightnessModel.h"
 #include "Draw.h"
 #include "SmallTextRenderer.h"
+#include "TextRenderer.h"
 #include <string.h>
 
 // ── Menu contents ─────────────────────────────────────────────────────────────
@@ -10,24 +11,36 @@
 // advances 4px per character into a 16px row). Longer ones scroll, which is
 // handled by ListMenu — but keeping the common cases short keeps the list calm.
 
+// Order must match the Game enum: startGame() indexes into it directly.
 static const MenuItem GAME_ITEMS[] = {
     { "SNAKE",      60, 220,  90 },
-    { "LIFE",      120, 200, 255 },
     { "INVADERS",  255,  90,  90 },
-    { "DINO",      240, 200, 120 },
+    { "DINO",      215, 195, 110 },   // desert sand — SNAKE already owns mint
+    { "PONG",      120, 200, 255 },
+    { "BRICKS",    255, 170,  60 },
     { "CYCLE ALL", 200, 120, 255 },
 };
-static const uint8_t GAME_COUNT  = 5;
-static const uint8_t CYCLE_INDEX = 4;   // "CYCLE ALL" is the last entry
+static const uint8_t GAME_COUNT  = 6;
+static const uint8_t CYCLE_INDEX = 5;   // "CYCLE ALL" is the last entry
 
 static const MenuItem SETTINGS_ITEMS[] = {
     { "BRIGHTNESS", 255, 200,  80 },
     { "PLACE",      120, 220, 255 },
     { "UNITS",      200, 255, 140 },
+    { "IP",         120, 255, 220 },
+    { "UPDATE",     255, 120, 160 },
 };
-static const uint8_t SETTINGS_COUNT = 3;
+static const uint8_t SETTINGS_COUNT = 5;
 
-enum : uint8_t { SET_BRIGHTNESS = 0, SET_PLACE = 1, SET_UNITS = 2 };
+enum : uint8_t {
+    SET_BRIGHTNESS = 0, SET_PLACE = 1, SET_UNITS = 2, SET_IP = 3, SET_UPDATE = 4
+};
+
+// The firmware's boot-time test seam turns this many clicks to reach UPDATE.
+// Reordering SETTINGS_ITEMS without moving the constant would silently point
+// the seam at PLACE, so the two are pinned together here.
+static_assert(SET_UPDATE == UiController::SETTINGS_UPDATE_INDEX,
+              "SETTINGS_UPDATE_INDEX must match UPDATE's slot in SETTINGS_ITEMS");
 
 // ── Construction ──────────────────────────────────────────────────────────────
 
@@ -52,17 +65,20 @@ void UiController::buildPlacesMenu() {
 // ── Entry points ──────────────────────────────────────────────────────────────
 
 void UiController::enterGames(uint32_t nowMs) {
+    menuAccum = 0;
     cur      = Screen::GAMES_MENU;
     cycleAll = false;
     gamesMenu.begin(GAME_ITEMS, GAME_COUNT, 0, nowMs);
 }
 
 void UiController::enterSettings(uint32_t nowMs) {
+    menuAccum = 0;
     cur = Screen::SETTINGS_MENU;
     settingsMenu.begin(SETTINGS_ITEMS, SETTINGS_COUNT, 0, nowMs);
 }
 
 void UiController::enterWeather(uint32_t nowMs) {
+    menuAccum = 0;
     cur              = Screen::WEATHER;
     weatherEnteredMs = nowMs;
 }
@@ -95,6 +111,29 @@ void UiController::startGame(uint8_t gameIndex, uint32_t nowMs) {
 
 // ── Input ─────────────────────────────────────────────────────────────────────
 
+bool UiController::screenIsList() const {
+    return cur == Screen::GAMES_MENU || cur == Screen::SETTINGS_MENU ||
+           cur == Screen::PLACES_MENU;
+}
+
+void UiController::encoderTurn(int detents, uint32_t nowMs) {
+    if (detents == 0) return;
+
+    // Value editors and the games take the knob raw: one click is one level, one
+    // unit, one game, in the direction you turned. Only the vertical lists get
+    // the transform below.
+    if (!screenIsList()) { turn(detents, nowMs); return; }
+
+    // Integer division truncates toward zero in both directions, so a detent
+    // either side of centre needs no special case: -1/2 and 1/2 are both 0, and
+    // the remainder keeps its sign.
+    menuAccum = (int8_t)(menuAccum + detents);
+    const int steps = menuAccum / MENU_DETENTS_PER_ROW;
+    menuAccum = (int8_t)(menuAccum - steps * MENU_DETENTS_PER_ROW);
+
+    if (steps) turn(-steps, nowMs);         // inverted: the list moves, not the cursor
+}
+
 void UiController::turn(int delta, uint32_t nowMs) {
     if (delta == 0) return;
 
@@ -111,6 +150,8 @@ void UiController::turn(int delta, uint32_t nowMs) {
                 cycleStartMs = nowMs;
                 startGame(cycleIndex, nowMs);
             } else {
+                // Not a list on screen: skipping games stays one click per game,
+                // and in the direction the knob turns.
                 gamesMenu.turn(delta, nowMs);
                 if (gamesMenu.selected() != CYCLE_INDEX) startGame(gamesMenu.selected(), nowMs);
             }
@@ -133,6 +174,12 @@ void UiController::turn(int delta, uint32_t nowMs) {
             setUnit(tempUnit == TempUnit::CELSIUS ? TempUnit::FAHRENHEIT : TempUnit::CELSIUS);
             break;
 
+        case Screen::UPDATE:
+            // Only the confirmation is steerable. There is no cancelling a flash
+            // write partway through, and the result screens have one exit.
+            if (otaSt == OtaPhase::CONFIRM) otaYes = !otaYes;
+            break;
+
         case Screen::WEATHER:
         default:
             break;
@@ -140,6 +187,7 @@ void UiController::turn(int delta, uint32_t nowMs) {
 }
 
 void UiController::press(uint32_t nowMs) {
+    menuAccum = 0;          // a part-turn does not carry into the next screen
     switch (cur) {
         case Screen::GAMES_MENU: {
             const uint8_t sel = gamesMenu.selected();
@@ -169,6 +217,18 @@ void UiController::press(uint32_t nowMs) {
                     cur = Screen::PLACES_MENU;
                     break;
                 case SET_UNITS:      cur = Screen::UNITS_EDIT; break;
+                case SET_IP:
+                    cur         = Screen::IP_VIEW;
+                    ipEnteredMs = nowMs;         // anchors the scroll dwell
+                    break;
+                case SET_UPDATE:
+                    // Always opens on NO: this reflashes the device, so the
+                    // destructive choice must never be one click away.
+                    otaSt  = OtaPhase::CONFIRM;
+                    otaYes = false;
+                    otaPct = 0;
+                    cur    = Screen::UPDATE;
+                    break;
                 default: break;
             }
             break;
@@ -180,7 +240,37 @@ void UiController::press(uint32_t nowMs) {
 
         case Screen::BRIGHTNESS_EDIT:
         case Screen::UNITS_EDIT:
+        case Screen::IP_VIEW:
             cur = Screen::SETTINGS_MENU;
+            break;
+
+        case Screen::UPDATE:
+            switch (otaSt) {
+                case OtaPhase::CONFIRM:
+                    if (otaYes && ipValid) {
+                        otaReq      = true;            // firmware: open the window
+                        otaSt       = OtaPhase::WAITING;
+                        otaWindowMs = nowMs;
+                        otaPct      = 0;
+                    } else if (otaYes) {
+                        // Nowhere to browse to. Failing here is honest; opening a
+                        // window on an address that does not exist is not.
+                        otaSt = OtaPhase::FAILED;
+                    } else {
+                        otaSt = OtaPhase::IDLE;
+                        cur   = Screen::SETTINGS_MENU;
+                    }
+                    break;
+                case OtaPhase::WAITING:            // give up waiting
+                case OtaPhase::SUCCEEDED:
+                case OtaPhase::FAILED:
+                    otaSt = OtaPhase::IDLE;
+                    cur   = Screen::SETTINGS_MENU;
+                    break;
+                case OtaPhase::RUNNING:
+                default:
+                    break;                             // a flash write is not cancellable
+            }
             break;
 
         case Screen::WEATHER:
@@ -190,6 +280,7 @@ void UiController::press(uint32_t nowMs) {
 }
 
 bool UiController::longPress(uint32_t nowMs) {
+    menuAccum = 0;
     switch (cur) {
         // Root screens: nowhere further up, so the caller returns to the main menu.
         case Screen::GAMES_MENU:
@@ -209,7 +300,17 @@ bool UiController::longPress(uint32_t nowMs) {
         case Screen::BRIGHTNESS_EDIT:
         case Screen::PLACES_MENU:
         case Screen::UNITS_EDIT:
+        case Screen::IP_VIEW:
             cur = Screen::SETTINGS_MENU;
+            return false;
+
+        // Backing out of a flash write in progress would leave a half-written
+        // slot with the UI claiming otherwise, so the gesture is ignored until
+        // the firmware reports a result.
+        case Screen::UPDATE:
+            if (otaSt == OtaPhase::RUNNING) return false;
+            otaSt = OtaPhase::IDLE;
+            cur   = Screen::SETTINGS_MENU;
             return false;
 
         default:
@@ -220,6 +321,25 @@ bool UiController::longPress(uint32_t nowMs) {
 // ── Frame ─────────────────────────────────────────────────────────────────────
 
 void UiController::update(uint32_t nowMs) {
+    // An upload window that nobody used must close itself. Leaving it open
+    // because the user wandered off is exactly how "nothing listens" quietly
+    // stops being true (docs/adr/0014).
+    if (cur == Screen::UPDATE && otaSt == OtaPhase::WAITING &&
+        (uint32_t)(nowMs - otaWindowMs) >= OTA_WINDOW_MS) {
+        otaSt = OtaPhase::IDLE;
+        cur   = Screen::SETTINGS_MENU;
+        return;
+    }
+
+    // A write that stops reporting is a write that is not happening. Neither
+    // gesture can leave RUNNING, so if the transport dies without a verdict the
+    // panel is stuck until the power goes — see OTA_STALL_MS.
+    if (cur == Screen::UPDATE && otaSt == OtaPhase::RUNNING &&
+        (uint32_t)(nowMs - otaProgressMs) >= OTA_STALL_MS) {
+        setOtaResult(false);
+        return;
+    }
+
     if (cur != Screen::GAME_PLAYING) return;
 
     if (cycleAll && (uint32_t)(nowMs - cycleStartMs) >= CYCLE_INTERVAL_MS) {
@@ -247,6 +367,236 @@ void UiController::renderUnits(uint8_t* buf) const {
     Draw::rect(buf, 9,  11, 3, 2, c ? 30 : col[0], c ? 30 : col[1], c ? 34 : col[2]);
 }
 
+// ── Network identity ──────────────────────────────────────────────────────────
+
+void UiController::setIpAddress(uint8_t a, uint8_t b, uint8_t c, uint8_t d) {
+    ip[0] = a; ip[1] = b; ip[2] = c; ip[3] = d;
+    ipValid = true;
+}
+
+void UiController::setNetworkDown() { ipValid = false; }
+
+void UiController::drawWide(uint8_t* buf, const char* text, int16_t x, int16_t y,
+                            const uint8_t* colour) {
+    // One glyph at a time. Rendering the whole string first would need a
+    // 15-character staging buffer — 90 x 7 x 3 = 1,890 bytes — carried purely to
+    // be blitted straight out again, on a part that has 320 KB total.
+    uint8_t  glyph[TextRenderer::CHAR_STRIDE * TextRenderer::CHAR_HEIGHT * 3];
+    char     one[2] = { 0, 0 };
+    int16_t  cx = x;
+
+    for (const char* p = text; *p; p++) {
+        one[0] = *p;
+        uint16_t w = 0, h = 0;
+        TextRenderer::renderText(one, glyph, w, h, colour);
+        // Clipped by Draw::blit, so glyphs scrolled off either edge cost nothing.
+        if (cx > -(int16_t)TextRenderer::CHAR_STRIDE && cx < (int16_t)Draw::W)
+            Draw::blit(buf, glyph, w, h, cx, y);
+        cx = (int16_t)(cx + TextRenderer::CHAR_STRIDE);
+    }
+}
+
+void UiController::formatIp(char* out) const {
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < 4; i++) {
+        const uint8_t v = ip[i];
+        if (v >= 100) out[n++] = (char)('0' + v / 100);
+        if (v >= 10)  out[n++] = (char)('0' + (v / 10) % 10);
+        out[n++] = (char)('0' + v % 10);
+        if (i < 3) out[n++] = '.';
+    }
+    out[n] = 0;
+}
+
+int16_t UiController::ipScrollOffset(uint16_t textW, uint32_t nowMs,
+                                     uint32_t anchorMs) const {
+    if (textW <= Draw::W) return 0;                    // fits: never scrolls
+    const uint32_t elapsed = nowMs - anchorMs;
+    if (elapsed <= IP_DWELL_MS) return 0;              // dwell on the first octet
+    const uint32_t travel = (uint32_t)textW + IP_GAP_PX;
+    const uint32_t moved  = ((elapsed - IP_DWELL_MS) * IP_PPS) / 1000u;
+    return (int16_t)-(int16_t)(moved % travel);
+}
+
+void UiController::renderIp(uint8_t* buf, uint32_t nowMs) const {
+    Draw::clear(buf);
+
+    static const uint8_t DOWN[3] = { 255, 90, 80 };
+    if (!ipValid) {
+        // Showing the last known address while offline would be actively
+        // misleading — it is exactly the address someone would then try to OTA
+        // to. The small font is right here: two short words, no scrolling.
+        uint8_t  txt[16 * SmallTextRenderer::CHAR_HEIGHT * 3];
+        uint16_t w = 0, h = 0;
+        SmallTextRenderer::renderText("NO", txt, w, h, DOWN);
+        Draw::blit(buf, txt, w, h, (int16_t)((16 - (int16_t)w) / 2), 3);
+        SmallTextRenderer::renderText("WIFI", txt, w, h, DOWN);
+        Draw::blit(buf, txt, w, h, (int16_t)((16 - (int16_t)w) / 2), 9);
+        return;
+    }
+
+    // "192.168.0.113" in the 5x7 font, scrolling. The 3x4 font would fit an
+    // octet per row with no movement at all, but four 4px rows stack with no
+    // gutter — the digits ran together, and on the panel this is a string you
+    // copy down while looking away, where glyph size beats not having to wait.
+    char text[16];
+    formatIp(text);
+
+    static const uint8_t COL[3] = { 120, 245, 220 };
+    const uint16_t w    = TextRenderer::textWidth(text);
+    const int16_t  xOff = ipScrollOffset(w, nowMs, ipEnteredMs);
+    const int16_t  y    = (int16_t)((16 - (int16_t)TextRenderer::CHAR_HEIGHT) / 2);
+
+    drawWide(buf, text, xOff, y, COL);
+    // Second copy so the wrap has no blank stretch at the seam.
+    if (w > Draw::W)
+        drawWide(buf, text, (int16_t)(xOff + (int16_t)w + IP_GAP_PX), y, COL);
+}
+
+// ── OTA ───────────────────────────────────────────────────────────────────────
+
+void UiController::setOtaProgress(uint8_t pct, uint32_t nowMs) {
+    otaPct = pct > 100 ? 100 : pct;
+    // Every report is also a sign of life; update() fails the write if these
+    // stop arriving (OTA_STALL_MS).
+    otaProgressMs = nowMs;
+    // A progress report is also the firmware saying "I am still writing", which
+    // is the only thing that can move the screen back out of a stale result.
+    if (otaSt != OtaPhase::RUNNING) {
+        otaSt = OtaPhase::RUNNING;
+        cur   = Screen::UPDATE;
+    }
+}
+
+void UiController::setOtaResult(bool ok) {
+    otaSt  = ok ? OtaPhase::SUCCEEDED : OtaPhase::FAILED;
+    otaPct = ok ? 100 : otaPct;
+    cur    = Screen::UPDATE;
+}
+
+void UiController::renderUpdate(uint8_t* buf, uint32_t nowMs) const {
+    Draw::clear(buf);
+
+    // Every state is a word, not a symbol: a 16x16 panel has no room for an icon
+    // that reads unambiguously, and "is that arrow up or down" is exactly the
+    // wrong question to be asking while a device reflashes itself (docs/adr/0011).
+    uint8_t  txt[16 * SmallTextRenderer::CHAR_HEIGHT * 3];
+    uint16_t w = 0, h = 0;
+
+    static const uint8_t PINK[3]  = { 255, 120, 160 };
+    static const uint8_t GREEN[3] = {  90, 235, 120 };
+    static const uint8_t RED[3]   = { 255,  70,  60 };
+    static const uint8_t GREY[3]  = { 120, 130, 150 };
+
+    const uint8_t TRACK_X = 1, TRACK_W = 14, BAR_Y = 10, BAR_H = 3;
+
+    switch (otaSt) {
+        case OtaPhase::CONFIRM: {
+            SmallTextRenderer::renderText("OTA", txt, w, h, PINK);
+            Draw::blit(buf, txt, w, h, (int16_t)((16 - (int16_t)w) / 2), 2);
+
+            SmallTextRenderer::renderText(otaYes ? "YES" : "NO", txt, w, h,
+                                          otaYes ? GREEN : GREY);
+            Draw::blit(buf, txt, w, h, (int16_t)((16 - (int16_t)w) / 2), 8);
+
+            // Two pips, same idiom as the units editor, so the pair reads as a
+            // two-state choice rather than as a label that happens to change.
+            Draw::rect(buf, 4, 13, 3, 2, otaYes ? 30 : GREY[0],
+                                          otaYes ? 30 : GREY[1],
+                                          otaYes ? 34 : GREY[2]);
+            Draw::rect(buf, 9, 13, 3, 2, otaYes ? GREEN[0] : 30,
+                                          otaYes ? GREEN[1] : 30,
+                                          otaYes ? GREEN[2] : 34);
+            break;
+        }
+
+        case OtaPhase::WAITING: {
+            // The whole point of this flow: the address you must browse to is on
+            // the panel in front of you, so the update needs no prior knowledge
+            // of the device and no server on your machine. The URL is shown
+            // whole — "HTTP://192.168.0.113" — because a bare dotted quad still
+            // leaves you guessing at the scheme and the port.
+            char url[24] = { 'H', 'T', 'T', 'P', ':', '/', '/', 0 };
+            formatIp(url + 7);
+
+            const uint16_t uw   = TextRenderer::textWidth(url);
+            const int16_t  xOff = ipScrollOffset(uw, nowMs, otaWindowMs);
+
+            drawWide(buf, url, xOff, 4, PINK);
+            if (uw > Draw::W)
+                drawWide(buf, url, (int16_t)(xOff + (int16_t)uw + IP_GAP_PX), 4, PINK);
+
+            // A slow sweep along the bottom: the window is open and timing out,
+            // and a moving pixel is the cheapest proof the device has not hung.
+            // Coverage, not brightness — see the RUNNING case below.
+            const uint32_t open = nowMs - otaWindowMs;
+            const int16_t  head = (int16_t)((open / 250u) % 16u);
+            Draw::px(buf, head, 14, PINK[0], PINK[1], PINK[2]);
+            break;
+        }
+
+        case OtaPhase::RUNNING: {
+            char pct[5];
+            // No snprintf here: this file is compiled for the ESP32 too, and the
+            // three cases are trivial.
+            const uint8_t v = otaPct;
+            if (v >= 100)     { pct[0] = '1'; pct[1] = '0'; pct[2] = '0'; pct[3] = 0; }
+            else if (v >= 10) { pct[0] = (char)('0' + v / 10); pct[1] = (char)('0' + v % 10); pct[2] = 0; }
+            else              { pct[0] = (char)('0' + v); pct[1] = 0; }
+
+            SmallTextRenderer::renderText(pct, txt, w, h, PINK);
+            Draw::blit(buf, txt, w, h, (int16_t)((16 - (int16_t)w) / 2), 3);
+
+            // The empty part of the track is drawn as SPARSE BRIGHT PIXELS, not
+            // as a dim solid bar.
+            //
+            // FastLED's global brightness multiplies every channel by
+            // level/255, and level 1 is 6 — so anything below about 43 floors to
+            // zero and simply is not on the panel. A dim (30,30,38) track is
+            // invisible at the bottom three levels, which is where this screen
+            // was a single lone digit on black: indistinguishable from a hung
+            // device at exactly the moment you are watching for progress.
+            //
+            // At low global brightness you can only modulate by COVERAGE, not by
+            // value. That is the same argument as docs/adr/0012 one step on: it
+            // is not just that unlit beats dim-lit for contrast, it is that
+            // dim-lit stops existing at all once the user turns the panel down.
+            for (int16_t x = TRACK_X; x < TRACK_X + TRACK_W; x += 3)
+                Draw::px(buf, x, BAR_Y + 1, (uint8_t)(PINK[0] / 2),
+                         (uint8_t)(PINK[1] / 2), (uint8_t)(PINK[2] / 2));
+            // End caps mark the extent, so an empty bar still reads as a bar.
+            Draw::px(buf, TRACK_X,               BAR_Y + 1, PINK[0], PINK[1], PINK[2]);
+            Draw::px(buf, TRACK_X + TRACK_W - 1, BAR_Y + 1, PINK[0], PINK[1], PINK[2]);
+
+            // Always at least one lit pixel once the write has started, so the
+            // bar reads as "begun" rather than "not responding".
+            uint8_t fill = (uint8_t)(((uint16_t)TRACK_W * otaPct) / 100);
+            if (fill < 1)       fill = 1;
+            if (fill > TRACK_W) fill = TRACK_W;
+            Draw::rect(buf, TRACK_X, BAR_Y, fill, BAR_H, PINK[0], PINK[1], PINK[2]);
+            break;
+        }
+
+        case OtaPhase::SUCCEEDED:
+            SmallTextRenderer::renderText("OK", txt, w, h, GREEN);
+            Draw::blit(buf, txt, w, h, (int16_t)((16 - (int16_t)w) / 2), 4);
+            Draw::rect(buf, TRACK_X, BAR_Y, TRACK_W, BAR_H, GREEN[0], GREEN[1], GREEN[2]);
+            break;
+
+        case OtaPhase::FAILED:
+            SmallTextRenderer::renderText("ERR", txt, w, h, RED);
+            Draw::blit(buf, txt, w, h, (int16_t)((16 - (int16_t)w) / 2), 4);
+            Draw::rect(buf, TRACK_X, BAR_Y, TRACK_W, BAR_H, RED[0], RED[1], RED[2]);
+            break;
+
+        case OtaPhase::IDLE:
+        default:
+            SmallTextRenderer::renderText("OTA", txt, w, h, PINK);
+            Draw::blit(buf, txt, w, h, (int16_t)((16 - (int16_t)w) / 2), 6);
+            break;
+    }
+}
+
 void UiController::render(uint8_t* buf, uint32_t nowMs) {
     switch (cur) {
         case Screen::GAMES_MENU:
@@ -271,6 +621,14 @@ void UiController::render(uint8_t* buf, uint32_t nowMs) {
 
         case Screen::UNITS_EDIT:
             renderUnits(buf);
+            break;
+
+        case Screen::IP_VIEW:
+            renderIp(buf, nowMs);
+            break;
+
+        case Screen::UPDATE:
+            renderUpdate(buf, nowMs);
             break;
 
         case Screen::WEATHER:

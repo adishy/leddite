@@ -43,6 +43,7 @@
 #include "NetworkMode.h"
 #include "OctopusMode.h"
 #include "UiMode.h"
+#include "OtaUpdater.h"
 #include "WeatherClient.h"
 #include "BrightnessModel.h"
 
@@ -103,6 +104,12 @@ void setup() {
     Serial.begin(115200);
     delay(500);
     Serial.println("\n=== LEDDITE V2 Multi-Mode Firmware ===");
+    // Printing the version and the running slot is what makes an OTA verifiable:
+    // without them a successful update and a silent no-op look identical here.
+    Serial.printf("Firmware %s on %s%s\n",
+                  OtaUpdater::version(),
+                  OtaUpdater::runningPartition(),
+                  OtaUpdater::pendingVerify() ? " (pending verify)" : "");
 
     // LEDs — init early for visual feedback during boot
     FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
@@ -175,6 +182,56 @@ void setup() {
     updateDisplay();
 
     Serial.println("Boot menu: rotate encoder to navigate, press to select");
+
+    // ── Hardware test seam ────────────────────────────────────────────────────
+    // Every mode is reachable only by turning and pressing a physical encoder,
+    // which makes all of them untestable on real hardware from a script. That is
+    // not a small gap: the WebSocket server's listening socket is opened in
+    // setup() and announced in the boot banner, but webSocket.loop() is only
+    // pumped inside NetworkMode::update(), so a host can complete a TCP connect
+    // and then time out on the WebSocket handshake — which is exactly what
+    // happened the first time hardware E2E was attempted.
+    //
+    // These two hooks are compiled out of a normal build (both #ifdefs are
+    // undefined, so this costs nothing in flash) and are set from the command
+    // line for a test image:
+    //
+    //   arduino-cli compile -b esp32:esp32:esp32:PartitionScheme=min_spiffs \
+    //     --build-property "compiler.cpp.extra_flags=-DLEDDITE_BOOT_MODE=2" ...
+    //
+    // The mode entry is all they force. Everything downstream — the protocol
+    // handler, the canvas, the serpentine mapping, the ACK, the OTA upload
+    // window — is the production path, which is the point.
+#ifdef LEDDITE_BOOT_MODE
+    currentMode = (AppMode)LEDDITE_BOOT_MODE;
+    Serial.printf("[TEST] boot mode forced to %d\n", (int)LEDDITE_BOOT_MODE);
+    if (currentMode == AppMode::GAMES)    uiMode.enterGames(canvas);
+    if (currentMode == AppMode::SETTINGS) uiMode.enterSettings(canvas);
+    updateDisplay();
+#endif
+#ifdef LEDDITE_TEST_OTA_ON_BOOT
+    // Opens the upload window with no encoder, so a script can POST an image.
+    // It walks the real menu rather than reaching past it: Settings -> UPDATE,
+    // turn onto YES, press. Every transition under test is the one a person
+    // performs, which is what makes this a seam and not a back door.
+    Serial.println("[TEST] opening the OTA upload window from boot");
+    delay(2000);                       // let WiFi settle and the banner flush
+    {
+        UiController& c = uiMode.controller();
+        // The controller learns its address from refreshNetworkStatus(), which
+        // normally runs in loop() — and loop() has not started yet. Without
+        // this the walk below reaches YES with no address and is correctly
+        // refused, which is a real guard doing its job, not a bug to route past.
+        uiMode.refreshNetworkStatus();
+        uiMode.enterSettings(canvas);
+        c.turn(UiController::SETTINGS_UPDATE_INDEX, millis());  // onto UPDATE
+        c.press(millis());                     // -> CONFIRM (defaults to NO)
+        c.turn(1, millis());                   // -> YES
+        c.press(millis());                     // -> WAITING; window opens
+        currentMode = AppMode::SETTINGS;
+        updateDisplay();
+    }
+#endif
 }
 
 // ── Shared helper: go back to boot menu ──────────────────────────────────────
@@ -197,6 +254,22 @@ void loop() {
     // invalidates the cached reading and refetches immediately.
     weatherClient.setPlace(uiMode.placeIndex());
     networkMode.setBrightnessCap(BrightnessModel::levelToFastLED(uiMode.brightnessLevel()));
+
+    // The IP is shown under Settings -> IP; you cannot OTA a device whose
+    // address you do not know, and it is otherwise only ever printed to a serial
+    // console nobody has attached.
+    uiMode.refreshNetworkStatus();
+
+    // ── OTA ───────────────────────────────────────────────────────────────────
+    // tick() marks a freshly-written image valid once the device has stayed up
+    // and connected — until it does, a bad image rolls back on the next reboot
+    // rather than needing a cable (see OtaUpdater.h).
+    OtaUpdater::tick();
+    // service() opens the upload window when the panel asks, pumps the HTTP
+    // server while it is open, and closes it again the moment the UI leaves the
+    // waiting/running phases. Non-blocking, so the panel keeps animating the
+    // URL while somebody walks to a browser.
+    OtaUpdater::service(uiMode.controller(), canvas);
     {
         static WeatherData wx;
         if (weatherClient.poll(wx) || currentMode == AppMode::CLOCK_CAL) {

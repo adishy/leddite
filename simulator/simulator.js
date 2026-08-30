@@ -23,7 +23,7 @@ let renderMode = 'network';
 // Mirrors UiController::Screen — for the on-page readout only.
 const SCREEN_NAMES = [
     'GAMES MENU', 'GAME PLAYING', 'SETTINGS MENU',
-    'BRIGHTNESS', 'PLACES', 'UNITS', 'WEATHER',
+    'BRIGHTNESS', 'PLACES', 'UNITS', 'WEATHER', 'IP', 'UPDATE',
 ];
 
 // ── WASM init ─────────────────────────────────────────────────────────────────
@@ -39,6 +39,10 @@ createLedditeModule().then((mod) => {
     // Seed a plausible reading so the weather screen shows something before any
     // real WeatherClient data exists (12.3 C, clear, daytime).
     deviceUI.setWeather(123, 0, true, true);
+
+    // Stand in for the firmware's WiFi so Settings -> IP shows a plausible
+    // address rather than 0.0.0.0.
+    deviceUI.setIpAddress(192, 168, 0, 113);
 
     console.log('WASM logic initialised (Canvas + DeviceUI)');
     initGrid();
@@ -162,7 +166,11 @@ document.getElementById('dev-weather').addEventListener('click', () => {
 function deviceUIEncoder(kind, delta) {
     if (renderMode !== 'device' || !deviceUI) return false;
     const now = Date.now() >>> 0;
-    if (kind === 'turn')       deviceUI.turn(delta, now);
+    // encoderTurn, not turn: the browser control stands in for the physical
+    // knob, so it must inherit the same inversion and granularity. A simulator
+    // with a nicer knob than the device is a simulator you cannot trust for
+    // feel (docs/adr/0010, docs/adr/0016).
+    if (kind === 'turn')       deviceUI.encoderTurn(delta, now);
     else if (kind === 'press') deviceUI.press(now);
     else if (kind === 'long') {
         // true means "nowhere further up" — the device would return to its main
@@ -315,6 +323,37 @@ function clearDisplay() {
         document.getElementById('sprite-info').textContent = '—';
     }
 }
+
+// ── OTA guide: "show me that screen" ──────────────────────────────────────────
+// Drives the real UiController rather than showing a picture of it, so what the
+// guide points at is the same state machine the ESP32 runs (docs/adr/0010). If
+// the screen ever changes, this walks to the new one.
+const SETTINGS_ROW = { ip: 'IP_VIEW', update: 'UPDATE' };
+const SCREEN_ID    = { IP_VIEW: 7, UPDATE: 8 };
+
+function showSettingsScreen(which) {
+    if (!deviceUI) return;
+    setRenderMode('device');
+
+    const want = SCREEN_ID[SETTINGS_ROW[which]];
+    const now  = () => Date.now() >>> 0;
+
+    // Walk the settings list pressing each row until the target opens, backing
+    // out of any row that is not it. Bounded so a renamed row cannot spin.
+    deviceUI.enterSettings(now());
+    for (let i = 0; i < 8; i++) {
+        deviceUI.press(now());
+        if (deviceUI.screen() === want) break;
+        if (deviceUI.screen() !== 2) deviceUI.longPress(now());   // 2 = SETTINGS_MENU
+        deviceUI.turn(1, now());
+    }
+    document.getElementById('matrix-container')
+            .scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+document.querySelectorAll('.ota-try').forEach((el) => {
+    el.addEventListener('click', () => showSettingsScreen(el.dataset.goto));
+});
 
 document.getElementById('clear-btn').addEventListener('click', clearDisplay);
 

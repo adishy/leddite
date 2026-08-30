@@ -21,8 +21,12 @@ const here = dirname(fileURLToPath(import.meta.url));
 const S = {
   GAMES_MENU: 0, GAME_PLAYING: 1, SETTINGS_MENU: 2,
   BRIGHTNESS_EDIT: 3, PLACES_MENU: 4, UNITS_EDIT: 5, WEATHER: 6,
+  IP_VIEW: 7, UPDATE: 8,
 };
-const GAME = { SNAKE: 0, LIFE: 1, INVADERS: 2, DINO: 3 };
+// Mirrors UiController::OtaPhase
+const OTA = { IDLE: 0, CONFIRM: 1, WAITING: 2, RUNNING: 3, SUCCEEDED: 4, FAILED: 5 };
+const GAME = { SNAKE: 0, INVADERS: 1, DINO: 2, PONG: 3, BREAKOUT: 4 };
+const GAME_COUNT = 5;   // mirrors Game::COUNT
 
 const WEATHER_STEADY = 5000;   // past WeatherView::PLACE_FLASH_MS
 
@@ -86,8 +90,9 @@ test('games menu renders and wraps', () => {
   ui.turn(1, 0); ui.tick(0);
   check(!same(first, frame(mod, ui)), 'turning did not change the frame');
 
-  // 5 entries: turning 5 times returns to the start.
-  ui.turn(1, 0); ui.turn(1, 0); ui.turn(1, 0); ui.turn(1, 0); ui.tick(0);
+  // GAME_COUNT games + "CYCLE ALL": turning that many times returns to the start.
+  for (let i = 1; i < GAME_COUNT + 1; i++) ui.turn(1, 0);
+  ui.tick(0);
   check(same(first, frame(mod, ui)), 'menu did not wrap after a full cycle');
   ui.delete();
 });
@@ -110,7 +115,7 @@ test('press launches a game, long-press returns to the list', () => {
 
 test('every game renders live pixels through the binding', () => {
   const ui = new mod.DeviceUI();
-  for (let g = 0; g < 4; g++) {
+  for (let g = 0; g < GAME_COUNT; g++) {
     ui.enterGames(0);
     for (let i = 0; i < g; i++) ui.turn(1, 0);
     ui.press(0);
@@ -125,14 +130,151 @@ test('every game renders live pixels through the binding', () => {
 test('CYCLE ALL advances through every game', () => {
   const ui = new mod.DeviceUI();
   ui.enterGames(0);
-  for (let i = 0; i < 4; i++) ui.turn(1, 0);      // land on CYCLE ALL
+  for (let i = 0; i < GAME_COUNT; i++) ui.turn(1, 0);   // land on CYCLE ALL
   ui.press(0);
   check(ui.cycling(), 'cycling flag not set');
 
   const seen = new Set([ui.currentGame()]);
   let t = 0;
-  for (let i = 0; i < 4000; i++) { t += 60; ui.tick(t); seen.add(ui.currentGame()); }
-  eq(seen.size, 4, 'cycle did not visit all four games');
+  // CYCLE_INTERVAL_MS is 20s per game, so a full lap needs GAME_COUNT of them.
+  for (let i = 0; i < 5000; i++) { t += 60; ui.tick(t); seen.add(ui.currentGame()); }
+  eq(seen.size, GAME_COUNT, `cycle did not visit all ${GAME_COUNT} games`);
+  ui.delete();
+});
+
+test('the IP screen shows an address through the committed artifact', () => {
+  const ui = new mod.DeviceUI();
+  ui.setIpAddress(192, 168, 0, 113);
+  ui.enterSettings(0);
+
+  let guard = 0;
+  while (ui.screen() === S.SETTINGS_MENU && guard++ < 10) {
+    ui.press(0);
+    if (ui.screen() === S.IP_VIEW) break;
+    ui.longPress(0);
+    ui.turn(1, 0);
+  }
+  eq(ui.screen(), S.IP_VIEW, 'never reached the IP screen');
+  ui.tick(0);
+  const shown = frame(mod, ui);
+  check(anyLit(shown), 'the IP screen rendered blank');
+
+  // A different address has to look different, or the screen is decorative.
+  ui.setIpAddress(10, 0, 42, 7);
+  ui.tick(0);
+  check(!same(shown, frame(mod, ui)), 'the screen ignored the address');
+
+  // Offline must not keep showing the last address — that is exactly the one
+  // somebody would then try to OTA to.
+  ui.setNetworkDown();
+  check(!ui.hasIpAddress(), 'still claims an address while offline');
+  ui.tick(0);
+  check(anyLit(frame(mod, ui)), 'the offline state rendered blank');
+  ui.delete();
+});
+
+test('the knob is inverted and halved on lists, raw on value editors', () => {
+  // The browser control calls encoderTurn, so this is the feel a person judges
+  // the device by without having the device in front of them.
+  const ui = new mod.DeviceUI();
+  ui.enterSettings(0);
+
+  // One detent is half a row: nothing moves yet.
+  ui.encoderTurn(1, 0);
+  ui.press(0);
+  eq(ui.screen(), S.BRIGHTNESS_EDIT, 'a single detent already changed the selection');
+  ui.longPress(0);
+
+  // Two detents is one row, and the list moves against the knob — so clockwise
+  // from row 0 lands on the last row, UPDATE.
+  ui.enterSettings(0);
+  ui.encoderTurn(2, 0);
+  ui.press(0);
+  eq(ui.screen(), S.UPDATE, 'two detents did not move one row, inverted');
+  ui.longPress(0);
+
+  // The brightness editor is not a list: one click, one level, same direction.
+  ui.enterSettings(0);
+  ui.press(0);
+  const before = ui.brightnessLevel();
+  ui.encoderTurn(1, 0);
+  eq(ui.brightnessLevel(), before + 1, 'the value editor was halved or inverted');
+  ui.delete();
+});
+
+test('the OTA flow runs end to end through the committed artifact', () => {
+  // The browser has no flash to write, so it plays the firmware's part: the
+  // page opens the window, then feeds progress and a verdict back in.
+  // Everything except the flash write is therefore exercised without a device.
+  const ui = new mod.DeviceUI();
+  ui.setIpAddress(192, 168, 0, 113);   // the window is refused without one
+  ui.enterSettings(0);
+
+  // Walk to the UPDATE row.
+  let guard = 0;
+  while (ui.screen() === S.SETTINGS_MENU && guard++ < 10) {
+    ui.press(0);
+    if (ui.screen() === S.UPDATE) break;
+    ui.longPress(0);
+    ui.turn(1, 0);
+  }
+  eq(ui.screen(), S.UPDATE, 'never reached the update screen');
+  eq(ui.otaPhase(), OTA.CONFIRM, 'update did not open on the confirmation');
+
+  // It must open on NO: confirming straight away cannot start a reflash.
+  ui.press(0);
+  check(!ui.otaRequested(), 'the default choice requested an update');
+  eq(ui.screen(), S.SETTINGS_MENU, 'declining did not return to settings');
+
+  // Now go through with it.
+  ui.press(0);
+  eq(ui.screen(), S.UPDATE, 'could not reopen the update screen');
+  ui.turn(1, 0);
+  ui.tick(0);
+  const confirmFrame = frame(mod, ui);
+  check(anyLit(confirmFrame), 'the confirmation rendered blank');
+
+  ui.press(0);
+  check(ui.otaRequested(), 'confirming YES did not raise the request');
+  ui.clearOtaRequest();
+  eq(ui.otaPhase(), OTA.WAITING, 'did not open the upload window');
+
+  // The waiting screen is the whole ergonomics of this flow: it carries the URL
+  // you type into a browser, so it must be drawn and it must scroll.
+  ui.tick(0);
+  const waitEarly = frame(mod, ui);
+  check(anyLit(waitEarly), 'the upload window rendered blank');
+  ui.tick(4000);
+  check(!same(waitEarly, frame(mod, ui)), 'the URL never scrolled');
+
+  // Bytes arriving is what turns waiting into writing.
+  ui.setOtaProgress(1, 0);
+  eq(ui.otaPhase(), OTA.RUNNING, 'progress did not enter the writing screen');
+
+  // A running write is not cancellable from either gesture.
+  ui.press(0);
+  check(!ui.longPress(0), 'long-press tried to exit to the main menu mid-write');
+  eq(ui.otaPhase(), OTA.RUNNING, 'an input escaped a running update');
+
+  // Progress must actually move pixels, or the panel looks hung.
+  ui.setOtaProgress(5, 0);
+  ui.tick(0);
+  const early = frame(mod, ui);
+  ui.setOtaProgress(85, 0);
+  ui.tick(0);
+  check(!same(early, frame(mod, ui)), 'the progress bar did not move');
+
+  ui.setOtaResult(true);
+  ui.tick(0);
+  const okFrame = frame(mod, ui);
+  eq(ui.otaPhase(), OTA.SUCCEEDED, 'success not recorded');
+
+  ui.setOtaResult(false);
+  ui.tick(0);
+  check(!same(okFrame, frame(mod, ui)), 'OK and ERR render identically');
+
+  ui.press(0);
+  eq(ui.screen(), S.SETTINGS_MENU, 'the result screen did not exit');
   ui.delete();
 });
 

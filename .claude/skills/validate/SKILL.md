@@ -53,5 +53,12 @@ has bindings, not that it is current.
 ## Hardware end-to-end
 
 `make test`/`test-wasm` never touch the device. For hardware, use the
-`flash-firmware` skill, then `test_suite.py <ip> 81` — note the device must be
-in **Network Canvas** mode, which requires physically navigating the boot menu.
+`flash-firmware` skill, then `test_suite.py <ip> 81` — the device must be in
+**Network Canvas** mode, which does **not** require physically navigating the
+boot menu: use the compile-time boot-mode seam (`-DLEDDITE_BOOT_MODE=2`). See
+that skill's §6. Asserting the encoder was required, without checking, wasted a
+round trip once already.
+
+Neither of these is a hardware gate. `test_suite.py` has run against real
+hardware exactly once; the games have never been watched on the physical panel.
+Say so rather than implying hardware coverage the repo does not have.

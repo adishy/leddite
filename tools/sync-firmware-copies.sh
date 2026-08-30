@@ -11,7 +11,15 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
-MODULES=(ColorUtils Draw SmallTextRenderer ListMenu GameEngine
+# Both halves of the duplicated core, exactly as CLAUDE.md lists them.
+#
+# The protocol set was missing here until a '/' glyph added to src/TextRenderer
+# never reached the device: the firmware kept a font with a blank where the
+# slashes in "HTTP://192.168.0.113" should be, and --check reported everything
+# in step because it was not looking. A guard that covers less than the rule it
+# enforces is worse than no guard, because it is believed.
+MODULES=(Canvas Transformer MarqueeEngine ProtocolHandler TextRenderer
+         ColorUtils Draw SmallTextRenderer ListMenu GameEngine
          BrightnessModel WeatherView Places UiController)
 
 CHECK=false

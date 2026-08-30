@@ -74,6 +74,9 @@ public:
     void enterWeather(uint32_t nowMs)  { ui.enterWeather(nowMs); }
 
     void turn(int delta, uint32_t nowMs) { ui.turn(delta, nowMs); }
+    // Raw encoder detents — inverted and halved on the vertical lists, exactly
+    // as the firmware does it, so the browser knob is not a nicer knob.
+    void encoderTurn(int detents, uint32_t nowMs) { ui.encoderTurn(detents, nowMs); }
     void press(uint32_t nowMs)           { ui.press(nowMs); }
     bool longPress(uint32_t nowMs)       { return ui.longPress(nowMs); }
 
@@ -98,6 +101,25 @@ public:
         ui.setUnit(u ? TempUnit::FAHRENHEIT : TempUnit::CELSIUS);
     }
 
+    // Stands in for the firmware's WiFi, so the IP screen can be seen and
+    // reviewed in the simulator like every other screen.
+    void setIpAddress(int a, int b, int c, int d) {
+        ui.setIpAddress((uint8_t)a, (uint8_t)b, (uint8_t)c, (uint8_t)d);
+    }
+    void setNetworkDown() { ui.setNetworkDown(); }
+    bool hasIpAddress()   { return ui.hasIpAddress(); }
+
+    // OTA. The browser has no flash to write, so it stands in for the firmware:
+    // otaRequested() goes true when the user confirms, and the page (or the node
+    // harness) drives the progress and the verdict back in. That means the whole
+    // update flow except the HTTP fetch can be exercised without a device.
+    bool otaRequested()  { return ui.otaRequested(); }
+    void clearOtaRequest() { ui.clearOtaRequest(); }
+    int  otaPhase()      { return (int)ui.otaPhase(); }
+    int  otaProgress()   { return ui.otaProgress(); }
+    void setOtaProgress(int pct, uint32_t nowMs) { ui.setOtaProgress((uint8_t)pct, nowMs); }
+    void setOtaResult(bool ok)   { ui.setOtaResult(ok); }
+
     // Stands in for WeatherClient, which only exists on the firmware side.
     void setWeather(int tempC10, int wmoCode, bool isDay, bool valid) {
         WeatherData d;
@@ -115,6 +137,7 @@ EMSCRIPTEN_BINDINGS(leddite_module) {
         .function("enterGames",          &DeviceUIWrapper::enterGames)
         .function("enterSettings",       &DeviceUIWrapper::enterSettings)
         .function("enterWeather",        &DeviceUIWrapper::enterWeather)
+        .function("encoderTurn",           &DeviceUIWrapper::encoderTurn)
         .function("turn",                &DeviceUIWrapper::turn)
         .function("press",               &DeviceUIWrapper::press)
         .function("longPress",           &DeviceUIWrapper::longPress)
@@ -129,7 +152,16 @@ EMSCRIPTEN_BINDINGS(leddite_module) {
         .function("setBrightnessLevel",  &DeviceUIWrapper::setBrightnessLevel)
         .function("setPlaceIndex",       &DeviceUIWrapper::setPlaceIndex)
         .function("setUnit",             &DeviceUIWrapper::setUnit)
-        .function("setWeather",          &DeviceUIWrapper::setWeather);
+        .function("setWeather",          &DeviceUIWrapper::setWeather)
+        .function("setIpAddress",        &DeviceUIWrapper::setIpAddress)
+        .function("setNetworkDown",      &DeviceUIWrapper::setNetworkDown)
+        .function("hasIpAddress",        &DeviceUIWrapper::hasIpAddress)
+        .function("otaRequested",        &DeviceUIWrapper::otaRequested)
+        .function("clearOtaRequest",     &DeviceUIWrapper::clearOtaRequest)
+        .function("otaPhase",            &DeviceUIWrapper::otaPhase)
+        .function("otaProgress",         &DeviceUIWrapper::otaProgress)
+        .function("setOtaProgress",      &DeviceUIWrapper::setOtaProgress)
+        .function("setOtaResult",        &DeviceUIWrapper::setOtaResult);
 
     class_<CanvasWrapper>("Canvas")
         .constructor<>()

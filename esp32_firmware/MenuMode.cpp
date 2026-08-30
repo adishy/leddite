@@ -7,7 +7,7 @@
 const char* const MenuMode::LABELS[NUM_OPTIONS] = {
     "CLOCK CAL WEATHER",  // 17 chars × 6 = 102px wide
     "NETWORK CANVAS",     // 14 chars × 6 = 84px wide
-    "VISUAL TIMER",       // 12 chars × 6 = 72px wide
+    "TIMER",              //  5 chars × 6 = 30px wide
     "CHARACTERS",         // 10 chars × 6 = 60px wide
     "GAME SCREENSAVERS",  // 17 chars × 6 = 102px wide
     "SETTINGS",           //  8 chars × 6 = 48px wide

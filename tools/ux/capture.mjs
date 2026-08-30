@@ -69,7 +69,7 @@ function run(ui, fromMs, toMs) {
 // colour rather than against whichever one happens to be selected first.
 
 withUI((ui) => {
-  const NAMES = ['SNAKE', 'LIFE', 'INVADERS', 'DINO', 'CYCLE ALL'];
+  const NAMES = ['SNAKE', 'INVADERS', 'DINO', 'PONG', 'BRICKS', 'CYCLE ALL'];
   ui.enterGames(0);
   for (let i = 0; i < NAMES.length; i++) {
     ui.tick(0);
@@ -79,7 +79,7 @@ withUI((ui) => {
 });
 
 withUI((ui) => {
-  const NAMES = ['BRIGHTNESS', 'PLACE', 'UNITS'];
+  const NAMES = ['BRIGHTNESS', 'PLACE', 'UNITS', 'IP', 'UPDATE'];
   ui.enterSettings(0);
   for (let i = 0; i < NAMES.length; i++) {
     ui.tick(0);
@@ -201,7 +201,7 @@ withUI((ui) => {
 // Sampled well into play, not at frame zero: a game that looks fine on its
 // opening frame can still be visually dead a few seconds later.
 
-const GAMES = ['SNAKE', 'LIFE', 'INVADERS', 'DINO'];
+const GAMES = ['SNAKE', 'INVADERS', 'DINO', 'PONG', 'BRICKS'];
 for (let g = 0; g < GAMES.length; g++) {
   withUI((ui) => {
     ui.enterGames(0);
@@ -214,6 +214,57 @@ for (let g = 0; g < GAMES.length; g++) {
     }
   });
 }
+
+// ── IP + OTA screens ──────────────────────────────────────────────────────────
+// Both are read while doing something else (typing an address, waiting on a
+// flash), so legibility at a glance matters more here than almost anywhere.
+const S_IP = 7, S_UPDATE = 8;
+
+function walkToSettingsScreen(ui, want) {
+  ui.enterSettings(0);
+  for (let i = 0; i < 10; i++) {
+    ui.press(0);
+    if (ui.screen() === want) return true;
+    if (ui.screen() !== 2) ui.longPress(0);
+    ui.turn(1, 0);
+  }
+  return false;
+}
+
+withUI((ui) => {
+  // A full scroll pass, so every octet can be checked as it goes by — the whole
+  // point of the marquee is that no single frame shows the address.
+  ui.setIpAddress(192, 168, 0, 113);
+  if (walkToSettingsScreen(ui, S_IP)) {
+    for (let t = 0; t <= 6000; t += 600) {
+      ui.tick(t);
+      shot('settings.ip', `192.168.0.113 t=${t}ms`, t, ui, 'settings.ip');
+    }
+  }
+});
+
+withUI((ui) => {
+  ui.setIpAddress(10, 0, 42, 7);
+  if (walkToSettingsScreen(ui, S_IP)) { ui.tick(0); shot('settings.ip.short', '10.0.42.7 dwell', 0, ui); }
+  ui.setNetworkDown();
+  ui.tick(0);
+  shot('settings.ip.short', 'no wifi', 0, ui);
+});
+
+withUI((ui) => {
+  if (!walkToSettingsScreen(ui, S_UPDATE)) return;
+  ui.tick(0);
+  shot('settings.ota', 'confirm NO', 0, ui);
+  ui.turn(1, 0); ui.tick(0);
+  shot('settings.ota', 'confirm YES', 0, ui);
+  ui.press(0); ui.clearOtaRequest();
+  for (const pct of [0, 7, 42, 88, 100]) {
+    ui.setOtaProgress(pct); ui.tick(0);
+    shot('settings.ota', `progress ${pct}%`, 0, ui);
+  }
+  ui.setOtaResult(true);  ui.tick(0); shot('settings.ota', 'result OK', 0, ui);
+  ui.setOtaResult(false); ui.tick(0); shot('settings.ota', 'result ERR', 0, ui);
+});
 
 writeFileSync(outPath, JSON.stringify(shots));
 console.log(`captured ${shots.length} frames -> ${outPath}`);

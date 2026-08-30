@@ -99,9 +99,19 @@ On macOS the port is `/dev/cu.usbserial-0001`, and `arduino-cli` ships inside
 Arduino IDE 2.x at
 `/Applications/Arduino IDE.app/Contents/Resources/app/lib/backend/resources/arduino-cli`.
 
-**Flash usage is at ~90%** of the default partition. The weather client's TLS
-stack is most of the increase. If a future change overflows it, build with
-`-b esp32:esp32:esp32:PartitionScheme=min_spiffs` for ~600 KB more app space.
+**Build with `PartitionScheme=min_spiffs`** — it is not optional any more:
+
+```bash
+arduino-cli compile -b esp32:esp32:esp32:PartitionScheme=min_spiffs esp32_firmware/esp32_firmware.ino
+arduino-cli upload  -p /dev/ttyUSB0 -b esp32:esp32:esp32:PartitionScheme=min_spiffs esp32_firmware/esp32_firmware.ino
+```
+
+That takes each OTA app slot from 0x140000 to 0x1E0000, and this build from 91%
+of a slot to **61%**. Omitting the flag silently reverts to the smaller layout.
+Nothing here uses SPIFFS, and `nvs` is at 0x9000/0x5000 in both schemes so saved
+settings survive the switch. **The first flash after this change must be over
+USB** — a partition table is not part of an OTA payload. See `docs/adr/0014`
+(partitions and rollback) and `docs/adr/0015` (the update flow itself).
 
 WiFi credentials go in `esp32_firmware/wifi_credentials.h` (gitignored). Generate
 it from `LEDDITE_SSID` / `LEDDITE_PASSWORD` without echoing the values:
@@ -109,6 +119,46 @@ it from `LEDDITE_SSID` / `LEDDITE_PASSWORD` without echoing the values:
 ```bash
 tools/gen-wifi-credentials.sh [path-to-env-file]
 ```
+
+### OTA updates
+
+`Settings → UPDATE` opens a **browser upload window**, it does not fetch
+(`docs/adr/0015`; `docs/adr/0014` is the superseded pull). The confirmation always
+opens on **NO**. Turning to YES starts an HTTP server on port 80 and scrolls the
+device's URL — `HTTP://192.168.0.113` — across the panel. You browse to it, drop a
+`.bin` on the page, and it is written to the other app slot.
+
+```bash
+arduino-cli compile -b esp32:esp32:esp32:PartitionScheme=min_spiffs \
+  --output-dir build/fw esp32_firmware/esp32_firmware.ino
+# then: Settings → UPDATE → YES at the panel, browse to the URL it shows,
+# and upload build/fw/esp32_firmware.ino.bin
+```
+
+There is nothing to configure and no image server to run. `tools/gen-ota-config.sh`
+and `ota_config.h` are gone; the version string is `LEDDITE_FW_VERSION` in
+`OtaUpdater.cpp`, overridable with a build property.
+
+**The window is deliberately short-lived.** It closes on the next press, on a
+long-press, on completion, and after `UiController::OTA_WINDOW_MS` (5 min). An
+upload server that stayed up for the device's whole uptime would accept firmware
+from anyone on the LAN — the window is what keeps physical presence as the
+authentication factor.
+
+**No firewall rule is needed on your machine.** The connection runs browser →
+device. The earlier pull needed the reverse and never worked here: the panel
+reaches its gateway in 8 ms and `1.1.1.1` in 20 ms but times out against the build
+host every time, because it sits one router hop away (host→gateway `ttl=64`,
+host→device `ttl=63`) and its ARP for an apparently on-link host never crosses
+that hop. A `ufw allow` was added on a wrong diagnosis and changed nothing.
+
+`Settings → IP` shows the same address on its own, for the times you want it
+without opening an update window.
+
+A freshly written image is on probation: `OtaUpdater::tick()` marks it valid only
+after 30 s of connected uptime, so an image that fails to boot rolls back to the
+previous slot by itself. The boot banner prints the version and the running slot,
+which is the only way to tell a successful update from a silent no-op.
 
 ## Architecture
 
@@ -171,12 +221,16 @@ The main sketch (`esp32_firmware/esp32_firmware.ino`) is a mode dispatcher. Each
 
 - **MenuMode** — boot menu; encoder navigates, press returns `AppMode` enum
 - **TimeMode** — NTP clock (Eastern Time), date, and current weather; cycles every 10 s, DVD-bounces around screen (the weather face does not bounce — it shows the temperature over a scrolling condition description)
-- **TimerMode** — encoder sets minutes 1–90, progress-bar countdown
+- **TimerMode** — "TIMER" in the boot menu; encoder sets minutes 1–90, progress-bar countdown
 - **NetworkMode** — WebSocket server; relays binary packets to `Canvas`, broadcasts encoder JSON
 - **OctopusMode** — animated character (Pac-Man ghost); encoder cycles 5 colour palettes
 - **UiMode** — thin Arduino shell around `src/UiController`, which owns the Games
   and Settings submenu trees. Supplies `millis()`, pushes the rendered buffer to
   `Canvas`, and mirrors brightness/place/unit into NVS via `Preferences`.
+  The games are Snake, Invaders, Dino, Pong and Breakout (`Game` enum order,
+  which `GAME_ITEMS` in `UiController.cpp` must match). Their headline
+  behaviours — the dino never hitting a cactus, Invaders' 0.3 win rate — are
+  explicit invariants with tests, not tuning; see `docs/adr/0013`.
 - **WeatherClient** — Open-Meteo (no API key) on its own FreeRTOS task, so a
   blocking HTTPS call never stalls the display. Fetches every 45 min with
   exponential backoff; always in Celsius, with conversion done at render time so

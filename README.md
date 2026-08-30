@@ -34,10 +34,10 @@ press to select.
 |------|-------|-------------|
 | Clock + Cal + Weather | **CK** | 24-hour clock (HH sky-blue / MM pink) DVD-bouncing once/sec, cycling every 10 s through date (DD orange / MMM green) and current weather (temperature + scrolling condition) |
 | Network Canvas | **NT** | WebSocket binary API (port 81); encoder events broadcast as JSON |
-| Visual Timer | **TM** | Encoder sets minutes (1–90), progress-bar countdown |
+| Timer | **TM** | Encoder sets minutes (1–90), progress-bar countdown |
 | Characters | **OC** | Animated Pac-Man ghost; press cycles 5 colour palettes |
-| Game Screensavers | **GS** | Auto-playing Snake, Game of Life, Space Invaders, Dino Jump, or Cycle All |
-| Settings | **ST** | Brightness (1–10), weather place, temperature units — persisted to NVS |
+| Game Screensavers | **GS** | Auto-playing Snake, Space Invaders, Dino Jump, Pong, Brick Breaker, or Cycle All |
+| Settings | **ST** | Brightness (1–10), weather place, temperature units (persisted to NVS), the device's IP address, and OTA firmware update |
 
 **Universal gestures**
 - Long press (3 s) → back to boot menu from any mode
@@ -88,18 +88,61 @@ test clients.
 See [`esp32_firmware/README.md`](esp32_firmware/README.md) for the complete
 guide: prerequisites, WiFi credentials, compile, flash, and serial monitoring.
 
-**TL;DR** (macOS, Arduino IDE 2.x installed):
+**`PartitionScheme=min_spiffs` is not optional.** Omitting it silently builds
+for the smaller app layout, and a device already running `min_spiffs` would
+then be flashed at the wrong offsets.
 
 ```bash
+# Keep the duplicated core modules in step first (RULES.md §2)
+tools/sync-firmware-copies.sh
+
 # Compile
-"/Applications/Arduino IDE.app/Contents/Resources/app/lib/backend/resources/arduino-cli" \
-  compile --fqbn esp32:esp32:esp32 esp32_firmware/
+arduino-cli compile -b esp32:esp32:esp32:PartitionScheme=min_spiffs \
+  --output-dir build/fw esp32_firmware/esp32_firmware.ino
 
-# Flash (adjust port)
-"/Applications/Arduino IDE.app/Contents/Resources/app/lib/backend/resources/arduino-cli" \
-  upload --fqbn esp32:esp32:esp32 --port /dev/cu.usbserial-0001 esp32_firmware/
+# Flash over USB (Linux; macOS is /dev/cu.usbserial-0001)
+arduino-cli upload -p /dev/ttyUSB0 -b esp32:esp32:esp32:PartitionScheme=min_spiffs \
+  --input-dir build/fw esp32_firmware/esp32_firmware.ino
+```
 
-# Run test suite against hardware
+On macOS, Arduino IDE 2.x bundles `arduino-cli` at
+`/Applications/Arduino IDE.app/Contents/Resources/app/lib/backend/resources/arduino-cli`.
+
+## Updating firmware over the air
+
+After the first USB flash you never need the cable again, unless the partition
+scheme changes — a partition table is not part of an OTA payload.
+
+**The device does not download anything. You upload to it from a browser.**
+
+1. Build an image (above); you want `build/fw/esp32_firmware.ino.bin`.
+2. At the panel: `Settings → UPDATE`. It opens on **NO** — turn to **YES** and
+   press. The panel scrolls the URL to browse to, e.g. `HTTP://192.168.0.113`.
+3. Open that URL on any machine on the same network, drop the `.bin` on the
+   page, press **Install**.
+4. The panel shows a percentage, then `OK`, then reboots.
+
+There is no image server to run, nothing to configure, and no firewall rule to
+add — the connection runs browser → device. The upload window is open only while
+somebody is holding that screen at the panel, and closes on the next press, on a
+long-press, on completion, or after five minutes.
+
+**A bad image cannot brick the panel.** A freshly written image is on probation
+until it has stayed booted and connected for 30 s; if it fails before that, the
+device reverts to the previous slot on its next reboot. The boot banner prints
+the version and the running slot (`app0`/`app1`), which is the only way to tell
+a real update from a silent no-op:
+
+```
+Firmware 2.2.0 on app1 (pending verify)
+[OTA] image on app1 marked valid after 30s healthy
+```
+
+See [`docs/adr/0015`](docs/adr/0015-ota-by-upload-to-the-device.md) for why this
+replaced an earlier pull-from-a-URL design.
+
+```bash
+# Run the test suite against hardware (needs Network Canvas mode)
 .venv/bin/python test_suite.py 192.168.1.100 81
 ```
 

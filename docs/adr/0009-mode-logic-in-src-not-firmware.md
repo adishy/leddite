@@ -67,7 +67,7 @@ builds produce **byte-identical** pixels.
 | `Draw` | Clipped primitives over the 768-byte frame buffer |
 | `SmallTextRenderer` | 3x4 proportional font — three text rows fit on a 16x16 |
 | `ListMenu` | Reusable vertical submenu: accent band, viewport panning, position bar |
-| `GameEngine` | Snake, Life, Invaders, Dino — deterministic, endless |
+| `GameEngine` | Snake, Invaders, Dino, Pong, Breakout — deterministic, endless |
 | `Places` | Fixed location table shared by tests, simulator and firmware |
 
 ## Consequences
