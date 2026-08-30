@@ -4,6 +4,7 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include "OtaUpdater.h"
 
 // Guards `latest` / `hasNew` between the fetch task and the main loop.
 static portMUX_TYPE weatherMux = portMUX_INITIALIZER_UNLOCKED;
@@ -70,6 +71,12 @@ void WeatherClient::run() {
             nextFetchMs  = now;      // fetch straight away
             failures     = 0;
         }
+
+        // A TLS session costs ~40 KB of heap and an OTA write holds one open for
+        // the whole download. Two at once is the one heap collision this
+        // firmware can actually provoke, so the weather fetch simply waits —
+        // it is on a 45-minute cadence and a minute's delay is invisible.
+        if (OtaUpdater::inProgress()) { vTaskDelay(pdMS_TO_TICKS(1000)); continue; }
 
         if ((int32_t)(now - nextFetchMs) >= 0 && WiFi.status() == WL_CONNECTED) {
             const Place& p = Places::get(place);

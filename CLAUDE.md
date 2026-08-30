@@ -99,9 +99,18 @@ On macOS the port is `/dev/cu.usbserial-0001`, and `arduino-cli` ships inside
 Arduino IDE 2.x at
 `/Applications/Arduino IDE.app/Contents/Resources/app/lib/backend/resources/arduino-cli`.
 
-**Flash usage is at ~90%** of the default partition. The weather client's TLS
-stack is most of the increase. If a future change overflows it, build with
-`-b esp32:esp32:esp32:PartitionScheme=min_spiffs` for ~600 KB more app space.
+**Build with `PartitionScheme=min_spiffs`** — it is not optional any more:
+
+```bash
+arduino-cli compile -b esp32:esp32:esp32:PartitionScheme=min_spiffs esp32_firmware/esp32_firmware.ino
+arduino-cli upload  -p /dev/ttyUSB0 -b esp32:esp32:esp32:PartitionScheme=min_spiffs esp32_firmware/esp32_firmware.ino
+```
+
+That takes each OTA app slot from 0x140000 to 0x1E0000, and this build from 91%
+of a slot to **61%**. Omitting the flag silently reverts to the smaller layout.
+Nothing here uses SPIFFS, and `nvs` is at 0x9000/0x5000 in both schemes so saved
+settings survive the switch. **The first flash after this change must be over
+USB** — a partition table is not part of an OTA payload. See `docs/adr/0014`.
 
 WiFi credentials go in `esp32_firmware/wifi_credentials.h` (gitignored). Generate
 it from `LEDDITE_SSID` / `LEDDITE_PASSWORD` without echoing the values:
@@ -109,6 +118,34 @@ it from `LEDDITE_SSID` / `LEDDITE_PASSWORD` without echoing the values:
 ```bash
 tools/gen-wifi-credentials.sh [path-to-env-file]
 ```
+
+### OTA updates
+
+`Settings → UPDATE` pulls a new image from a URL and writes it to the other app
+slot. The confirmation always opens on **NO**, and the device only ever fetches —
+nothing listens (`docs/adr/0014`).
+
+```bash
+tools/gen-ota-config.sh [path-to-env-file]     # writes esp32_firmware/ota_config.h (gitignored)
+```
+
+It reads `LEDDITE_OTA_URL` (required), `LEDDITE_OTA_USER`, `LEDDITE_OTA_PASS` and
+`LEDDITE_FW_VERSION`; see `esp32_firmware/ota_config.h.example`. The header is
+guarded by `__has_include`, so a clone without it still compiles — the menu entry
+stays and reports ERR.
+
+Publishing an image is just serving the compiled `.bin`:
+
+```bash
+arduino-cli compile -b esp32:esp32:esp32:PartitionScheme=min_spiffs \
+  --output-dir build/fw esp32_firmware/esp32_firmware.ino
+cp build/fw/esp32_firmware.ino.bin /srv/leddite.bin
+```
+
+A freshly written image is on probation: `OtaUpdater::tick()` marks it valid only
+after 30 s of connected uptime, so an image that fails to boot rolls back to the
+previous slot by itself. The boot banner prints the version and the running slot,
+which is the only way to tell a successful update from a silent no-op.
 
 ## Architecture
 

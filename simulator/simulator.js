@@ -23,7 +23,7 @@ let renderMode = 'network';
 // Mirrors UiController::Screen — for the on-page readout only.
 const SCREEN_NAMES = [
     'GAMES MENU', 'GAME PLAYING', 'SETTINGS MENU',
-    'BRIGHTNESS', 'PLACES', 'UNITS', 'WEATHER',
+    'BRIGHTNESS', 'PLACES', 'UNITS', 'WEATHER', 'UPDATE',
 ];
 
 // ── WASM init ─────────────────────────────────────────────────────────────────

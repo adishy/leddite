@@ -21,6 +21,7 @@ history; each cites the commits it is reconstructed from.
 | [0011](0011-words-not-icons-on-a-16x16-panel.md) | Words, not icons, on a 16x16 panel | 2026-08-24 | Accepted |
 | [0012](0012-unlit-is-the-best-background.md) | Unlit is the best background this panel has | 2026-08-24 | Accepted |
 | [0013](0013-screensaver-games-decide-outcomes-in-advance.md) | Screensaver games decide their outcomes in advance | 2026-08-30 | Accepted |
+| [0014](0014-ota-by-pull-with-deferred-rollback.md) | OTA by pull, triggered at the panel, with deferred rollback | 2026-08-30 | Accepted |
 
 ## The thread running through these
 

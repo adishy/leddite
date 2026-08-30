@@ -43,6 +43,7 @@
 #include "NetworkMode.h"
 #include "OctopusMode.h"
 #include "UiMode.h"
+#include "OtaUpdater.h"
 #include "WeatherClient.h"
 #include "BrightnessModel.h"
 
@@ -103,6 +104,12 @@ void setup() {
     Serial.begin(115200);
     delay(500);
     Serial.println("\n=== LEDDITE V2 Multi-Mode Firmware ===");
+    // Printing the version and the running slot is what makes an OTA verifiable:
+    // without them a successful update and a silent no-op look identical here.
+    Serial.printf("Firmware %s on %s%s\n",
+                  OtaUpdater::version(),
+                  OtaUpdater::runningPartition(),
+                  OtaUpdater::pendingVerify() ? " (pending verify)" : "");
 
     // LEDs — init early for visual feedback during boot
     FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
@@ -197,6 +204,17 @@ void loop() {
     // invalidates the cached reading and refetches immediately.
     weatherClient.setPlace(uiMode.placeIndex());
     networkMode.setBrightnessCap(BrightnessModel::levelToFastLED(uiMode.brightnessLevel()));
+
+    // ── OTA ───────────────────────────────────────────────────────────────────
+    // tick() marks a freshly-written image valid once the device has stayed up
+    // and connected — until it does, a bad image rolls back on the next reboot
+    // rather than needing a cable (see OtaUpdater.h).
+    OtaUpdater::tick();
+    if (uiMode.controller().otaRequested()) {
+        uiMode.controller().clearOtaRequest();
+        OtaUpdater::run(uiMode.controller(), canvas);   // blocks; reboots on success
+        return;
+    }
     {
         static WeatherData wx;
         if (weatherClient.poll(wx) || currentMode == AppMode::CLOCK_CAL) {

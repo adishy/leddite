@@ -11,10 +11,11 @@
 // SCREENS
 //   GAMES_MENU      list of games (Game enum order) + "CYCLE ALL"
 //   GAME_PLAYING    a game running full-screen
-//   SETTINGS_MENU   BRIGHTNESS / PLACE / UNITS
+//   SETTINGS_MENU   BRIGHTNESS / PLACE / UNITS / UPDATE
 //   BRIGHTNESS_EDIT level 1-10
 //   PLACES_MENU     the Places table
 //   UNITS_EDIT      Celsius or Fahrenheit
+//   UPDATE          OTA: confirm, then progress, then a result
 //   WEATHER         icon + temperature for the selected place
 //
 // INPUT CONTRACT
@@ -44,6 +45,19 @@ public:
         PLACES_MENU,
         UNITS_EDIT,
         WEATHER,
+        UPDATE,
+    };
+
+    // OTA lifecycle. UiController owns the screen and the request flag; the
+    // firmware owns the flash write and reports back through setOtaProgress()
+    // and setOtaResult(). Keeping the split here means the whole flow except the
+    // HTTP fetch is unit-testable and visible in the simulator (docs/adr/0014).
+    enum class OtaPhase : uint8_t {
+        IDLE = 0,
+        CONFIRM,     // "OTA — YES / NO"
+        RUNNING,     // progress bar, driven by setOtaProgress()
+        SUCCEEDED,   // the device is about to reboot
+        FAILED,      // press or long-press to back out
     };
 
     // How long each game runs before "CYCLE ALL" advances to the next.
@@ -88,10 +102,22 @@ public:
     Game currentGame() const { return engine.game(); }
     bool cycling()     const { return cycleAll; }
 
+    // ── OTA ──────────────────────────────────────────────────────────────────
+    // The firmware polls otaRequested() every loop; when it is set it clears the
+    // request and performs the update, calling setOtaProgress() as bytes land
+    // and setOtaResult() at the end. Nothing here knows what HTTP is.
+    bool     otaRequested()  const { return otaReq; }
+    void     clearOtaRequest()     { otaReq = false; }
+    OtaPhase otaPhase()      const { return otaSt; }
+    uint8_t  otaProgress()   const { return otaPct; }
+    void     setOtaProgress(uint8_t pct);
+    void     setOtaResult(bool ok);
+
 private:
     void startGame(uint8_t gameIndex, uint32_t nowMs);
     void buildPlacesMenu();
     void renderUnits(uint8_t* buf) const;
+    void renderUpdate(uint8_t* buf) const;
 
     Screen   cur       = Screen::GAMES_MENU;
     uint8_t  brightness = 4;                       // BrightnessModel::DEFAULT_LEVEL
@@ -113,6 +139,11 @@ private:
 
     WeatherData weather;
     uint32_t    weatherEnteredMs = 0;
+
+    OtaPhase otaSt  = OtaPhase::IDLE;
+    bool     otaYes = false;    // CONFIRM defaults to NO — this reflashes the device
+    bool     otaReq = false;
+    uint8_t  otaPct = 0;
 };
 
 #endif // UI_CONTROLLER_H

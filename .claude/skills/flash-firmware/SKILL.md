@@ -63,17 +63,15 @@ Do not print the file contents afterwards.
 
 ## 3. Compile
 
-```bash
-arduino-cli compile -b esp32:esp32:esp32 esp32_firmware/esp32_firmware.ino
-```
-
-Takes ~2–4 minutes cold; run it in the background rather than letting it time out.
-
-**Flash sits at ~90% of the default partition.** If a change overflows it:
+**Always pass `PartitionScheme=min_spiffs`.** Omitting it silently reverts to the
+smaller app slots, and the size check then measures against the wrong maximum.
 
 ```bash
 arduino-cli compile -b esp32:esp32:esp32:PartitionScheme=min_spiffs esp32_firmware/esp32_firmware.ino
 ```
+
+Takes ~2–4 minutes cold; run it in the background rather than letting it time out.
+The build sits at ~61% of a `min_spiffs` app slot (`docs/adr/0014`).
 
 ## 4. Upload
 
@@ -83,7 +81,7 @@ Find the port — the naming differs by platform:
 # Linux:  /dev/ttyUSB0        macOS: /dev/cu.usbserial-0001 (or /dev/cu.SLAB_USBtoUART)
 PORT=$(ls /dev/cu.usbserial-* /dev/cu.SLAB_USBtoUART /dev/ttyUSB* 2>/dev/null | head -1)
 arduino-cli board list        # cross-check
-arduino-cli upload -p "$PORT" -b esp32:esp32:esp32 esp32_firmware/esp32_firmware.ino
+arduino-cli upload -p "$PORT" -b esp32:esp32:esp32:PartitionScheme=min_spiffs esp32_firmware/esp32_firmware.ino
 ```
 
 On **Linux** the user must be in the `dialout` group (`id -nG | grep dialout`).
@@ -120,6 +118,7 @@ A healthy boot looks like:
 
 ```
 === LEDDITE V2 Multi-Mode Firmware ===
+Firmware 2.1.0 on app0
 Connecting to <ssid>....
 IP: 192.168.0.113
 NTP sync........ OK
@@ -135,6 +134,16 @@ Boot menu: rotate encoder to navigate, press to select
 Check specifically for: an IP, NTP `OK`, the NVS settings line, and a
 `[Weather] <CODE>: ...` line proving a live fetch succeeded. `[Weather] fetch
 failed` with a backoff is a real failure, not noise.
+
+The `Firmware <version> on <slot>` line is what distinguishes a successful OTA
+from a silent no-op. `(pending verify)` after the slot means the image is on
+probation and will roll back unless it stays up for 30 s (`docs/adr/0014`).
+
+## 5b. WiFi credentials and OTA config are separate generators
+
+`tools/gen-ota-config.sh` writes the gitignored `esp32_firmware/ota_config.h`. It
+is optional — the build guards the include — but without it the Settings → UPDATE
+entry reports ERR.
 
 ## 6. Optional hardware e2e
 

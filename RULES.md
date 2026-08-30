@@ -73,3 +73,9 @@ duplication exists and what replaces it.
 
 Arduino-free, with time and randomness injected, so it can be unit-tested and run
 in the simulator. Full rationale in `docs/adr/0009-mode-logic-in-src-not-firmware.md`.
+
+Code that genuinely *needs* Arduino stays in `esp32_firmware/` and is not
+duplicated — `OtaUpdater` writes flash and `WeatherClient` runs a FreeRTOS task,
+so neither has a `src/` twin. The split to aim for is the one OTA uses: the
+screens, the confirmation and the progress value live in `src/UiController`
+where they are tested, and only the flash write is Arduino-side.

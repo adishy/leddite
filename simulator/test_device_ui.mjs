@@ -20,8 +20,10 @@ const here = dirname(fileURLToPath(import.meta.url));
 // Mirrors UiController::Screen
 const S = {
   GAMES_MENU: 0, GAME_PLAYING: 1, SETTINGS_MENU: 2,
-  BRIGHTNESS_EDIT: 3, PLACES_MENU: 4, UNITS_EDIT: 5, WEATHER: 6,
+  BRIGHTNESS_EDIT: 3, PLACES_MENU: 4, UNITS_EDIT: 5, WEATHER: 6, UPDATE: 7,
 };
+// Mirrors UiController::OtaPhase
+const OTA = { IDLE: 0, CONFIRM: 1, RUNNING: 2, SUCCEEDED: 3, FAILED: 4 };
 const GAME = { SNAKE: 0, INVADERS: 1, DINO: 2, PONG: 3, BREAKOUT: 4 };
 const GAME_COUNT = 5;   // mirrors Game::COUNT
 
@@ -136,6 +138,69 @@ test('CYCLE ALL advances through every game', () => {
   // CYCLE_INTERVAL_MS is 20s per game, so a full lap needs GAME_COUNT of them.
   for (let i = 0; i < 5000; i++) { t += 60; ui.tick(t); seen.add(ui.currentGame()); }
   eq(seen.size, GAME_COUNT, `cycle did not visit all ${GAME_COUNT} games`);
+  ui.delete();
+});
+
+test('the OTA flow runs end to end through the committed artifact', () => {
+  // The browser has no flash to write, so it plays the firmware's part: the
+  // page confirms, then feeds progress and a verdict back in. Everything except
+  // the HTTP fetch is therefore exercised without a device.
+  const ui = new mod.DeviceUI();
+  ui.enterSettings(0);
+
+  // Walk to the UPDATE row.
+  let guard = 0;
+  while (ui.screen() === S.SETTINGS_MENU && guard++ < 8) {
+    ui.press(0);
+    if (ui.screen() === S.UPDATE) break;
+    ui.longPress(0);
+    ui.turn(1, 0);
+  }
+  eq(ui.screen(), S.UPDATE, 'never reached the update screen');
+  eq(ui.otaPhase(), OTA.CONFIRM, 'update did not open on the confirmation');
+
+  // It must open on NO: confirming straight away cannot start a reflash.
+  ui.press(0);
+  check(!ui.otaRequested(), 'the default choice requested an update');
+  eq(ui.screen(), S.SETTINGS_MENU, 'declining did not return to settings');
+
+  // Now go through with it.
+  ui.press(0);
+  eq(ui.screen(), S.UPDATE, 'could not reopen the update screen');
+  ui.turn(1, 0);
+  ui.tick(0);
+  const confirmFrame = frame(mod, ui);
+  check(anyLit(confirmFrame), 'the confirmation rendered blank');
+
+  ui.press(0);
+  check(ui.otaRequested(), 'confirming YES did not raise the request');
+  ui.clearOtaRequest();
+  eq(ui.otaPhase(), OTA.RUNNING, 'did not enter the progress screen');
+
+  // A running write is not cancellable from either gesture.
+  ui.press(0);
+  check(!ui.longPress(0), 'long-press tried to exit to the main menu mid-write');
+  eq(ui.otaPhase(), OTA.RUNNING, 'an input escaped a running update');
+
+  // Progress must actually move pixels, or the panel looks hung.
+  ui.setOtaProgress(5);
+  ui.tick(0);
+  const early = frame(mod, ui);
+  ui.setOtaProgress(85);
+  ui.tick(0);
+  check(!same(early, frame(mod, ui)), 'the progress bar did not move');
+
+  ui.setOtaResult(true);
+  ui.tick(0);
+  const okFrame = frame(mod, ui);
+  eq(ui.otaPhase(), OTA.SUCCEEDED, 'success not recorded');
+
+  ui.setOtaResult(false);
+  ui.tick(0);
+  check(!same(okFrame, frame(mod, ui)), 'OK and ERR render identically');
+
+  ui.press(0);
+  eq(ui.screen(), S.SETTINGS_MENU, 'the result screen did not exit');
   ui.delete();
 });
 

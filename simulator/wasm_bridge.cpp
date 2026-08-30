@@ -98,6 +98,17 @@ public:
         ui.setUnit(u ? TempUnit::FAHRENHEIT : TempUnit::CELSIUS);
     }
 
+    // OTA. The browser has no flash to write, so it stands in for the firmware:
+    // otaRequested() goes true when the user confirms, and the page (or the node
+    // harness) drives the progress and the verdict back in. That means the whole
+    // update flow except the HTTP fetch can be exercised without a device.
+    bool otaRequested()  { return ui.otaRequested(); }
+    void clearOtaRequest() { ui.clearOtaRequest(); }
+    int  otaPhase()      { return (int)ui.otaPhase(); }
+    int  otaProgress()   { return ui.otaProgress(); }
+    void setOtaProgress(int pct) { ui.setOtaProgress((uint8_t)pct); }
+    void setOtaResult(bool ok)   { ui.setOtaResult(ok); }
+
     // Stands in for WeatherClient, which only exists on the firmware side.
     void setWeather(int tempC10, int wmoCode, bool isDay, bool valid) {
         WeatherData d;
@@ -129,7 +140,13 @@ EMSCRIPTEN_BINDINGS(leddite_module) {
         .function("setBrightnessLevel",  &DeviceUIWrapper::setBrightnessLevel)
         .function("setPlaceIndex",       &DeviceUIWrapper::setPlaceIndex)
         .function("setUnit",             &DeviceUIWrapper::setUnit)
-        .function("setWeather",          &DeviceUIWrapper::setWeather);
+        .function("setWeather",          &DeviceUIWrapper::setWeather)
+        .function("otaRequested",        &DeviceUIWrapper::otaRequested)
+        .function("clearOtaRequest",     &DeviceUIWrapper::clearOtaRequest)
+        .function("otaPhase",            &DeviceUIWrapper::otaPhase)
+        .function("otaProgress",         &DeviceUIWrapper::otaProgress)
+        .function("setOtaProgress",      &DeviceUIWrapper::setOtaProgress)
+        .function("setOtaResult",        &DeviceUIWrapper::setOtaResult);
 
     class_<CanvasWrapper>("Canvas")
         .constructor<>()
