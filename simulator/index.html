@@ -64,6 +64,83 @@
             </div>
             <div id="encoder-log" class="encoder-log">encoder events will appear here</div>
         </div>
+
+        <!-- OTA walkthrough. The panel is 16x16: it can show a progress bar and
+             the word ERR, and it has nowhere to tell you *why*. That explanation
+             has to live somewhere, and the simulator is the one place a person
+             is already looking at this UI. -->
+        <details class="ota-guide" id="ota-guide">
+            <summary>Updating firmware over the air (OTA)</summary>
+
+            <p class="ota-lead">
+                The device only ever <strong>pulls</strong>, and only when someone presses the
+                encoder — nothing listens on the network. So an update is three things:
+                build an image, serve it, then walk to the panel.
+            </p>
+
+            <ol class="ota-steps">
+                <li>
+                    <b>Find the device's address.</b> On the panel:
+                    <code>Settings &rarr; IP</code>. It shows one octet per row.
+                    <span class="ota-try" data-goto="ip">Show me that screen &rarr;</span>
+                </li>
+                <li>
+                    <b>Build an image.</b> The partition scheme is not optional — omitting it
+                    silently builds for the smaller layout:
+<pre>arduino-cli compile -b esp32:esp32:esp32:PartitionScheme=min_spiffs \
+  --output-dir build/fw esp32_firmware/esp32_firmware.ino</pre>
+                </li>
+                <li>
+                    <b>Serve it</b> from any static HTTP server on your machine:
+<pre>cp build/fw/esp32_firmware.ino.bin /srv/leddite.bin
+python3 -m http.server 8123 --directory /srv --bind 0.0.0.0</pre>
+                </li>
+                <li>
+                    <b>Point the device at it</b> — writes the gitignored
+                    <code>esp32_firmware/ota_config.h</code>, then reflash once over USB:
+<pre>LEDDITE_OTA_URL="http://&lt;your-ip&gt;:8123/leddite.bin" \
+  tools/gen-ota-config.sh</pre>
+                </li>
+                <li>
+                    <b>Run it.</b> On the panel: <code>Settings &rarr; UPDATE</code>. It opens on
+                    <b>NO</b> — turn to <b>YES</b> and press. You get a percentage and a bar,
+                    then <code>OK</code>, then a reboot.
+                    <span class="ota-try" data-goto="update">Show me that screen &rarr;</span>
+                </li>
+            </ol>
+
+            <div class="ota-note ota-warn">
+                <b>The first flash after a partition change must be over USB.</b>
+                A partition table is not part of an OTA payload, so a device still running the
+                old layout would write the image at the wrong offset.
+            </div>
+
+            <div class="ota-note">
+                <b>If the panel shows <code>ERR</code>:</b> it has 16&times;16 pixels and no room
+                to say why. The reason is on the serial log — but in practice it is almost
+                always one of these:
+                <ul>
+                    <li><b>Your firewall is dropping the device's connection.</b> The device
+                        connects <em>to your machine</em>, which most desktop firewalls block by
+                        default. On Ubuntu:
+                        <code>sudo ufw allow 8123/tcp</code>.
+                        Ping is not a useful check here — <code>ufw</code> permits ICMP while
+                        dropping TCP, so the device pings fine and still cannot fetch.</li>
+                    <li><b>Wrong address.</b> Your machine's IP, not the device's. Check it
+                        against <code>Settings &rarr; IP</code> on the panel.</li>
+                    <li><b>Different networks.</b> Some routers keep 2.4 GHz and 5 GHz clients
+                        apart, and the ESP32 is 2.4 GHz only.</li>
+                    <li><b>Already up to date.</b> The server returned "no update"; the panel has
+                        only two words and shows <code>ERR</code> for it.</li>
+                </ul>
+            </div>
+
+            <div class="ota-note">
+                <b>A bad image cannot brick the panel.</b> A freshly written image is on probation
+                until it has stayed booted and connected for 30&nbsp;s. If it fails before that,
+                the device reverts to the previous slot on its next reboot.
+            </div>
+        </details>
     </div>
 
     <!-- The WASM module is built with MODULARIZE=1, so this script defines a

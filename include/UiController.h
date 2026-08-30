@@ -11,10 +11,11 @@
 // SCREENS
 //   GAMES_MENU      list of games (Game enum order) + "CYCLE ALL"
 //   GAME_PLAYING    a game running full-screen
-//   SETTINGS_MENU   BRIGHTNESS / PLACE / UNITS / UPDATE
+//   SETTINGS_MENU   BRIGHTNESS / PLACE / UNITS / IP / UPDATE
 //   BRIGHTNESS_EDIT level 1-10
 //   PLACES_MENU     the Places table
 //   UNITS_EDIT      Celsius or Fahrenheit
+//   IP_VIEW         the device's own address, scrolling in the 5x7 font
 //   UPDATE          OTA: confirm, then progress, then a result
 //   WEATHER         icon + temperature for the selected place
 //
@@ -45,6 +46,7 @@ public:
         PLACES_MENU,
         UNITS_EDIT,
         WEATHER,
+        IP_VIEW,
         UPDATE,
     };
 
@@ -94,6 +96,15 @@ public:
     bool  settingsDirty() const { return dirty; }
     void  clearSettingsDirty()  { dirty = false; }
 
+    // ── Network identity, supplied by the firmware ───────────────────────────
+    // You cannot OTA a device whose address you do not know, and the address is
+    // otherwise only ever printed to a serial console nobody has attached. The
+    // controller stores four octets rather than a string so it stays free of
+    // any allocation and of Arduino's IPAddress type (docs/adr/0009).
+    void setIpAddress(uint8_t a, uint8_t b, uint8_t c, uint8_t d);
+    void setNetworkDown();
+    bool hasIpAddress() const { return ipValid; }
+
     // ── Weather data, supplied by the firmware's WeatherClient ───────────────
     void setWeather(const WeatherData& d) { weather = d; }
     const WeatherData& weatherData() const { return weather; }
@@ -118,6 +129,12 @@ private:
     void buildPlacesMenu();
     void renderUnits(uint8_t* buf) const;
     void renderUpdate(uint8_t* buf) const;
+    void renderIp(uint8_t* buf, uint32_t nowMs) const;
+    // Draws `text` in the 5x7 font one glyph at a time at (x, y). Per-glyph
+    // avoids staging the whole 90px string in a 2KB buffer just to blit it.
+    static void drawWide(uint8_t* buf, const char* text, int16_t x, int16_t y,
+                         const uint8_t* colour);
+    int16_t ipScrollOffset(uint16_t textW, uint32_t nowMs) const;
 
     Screen   cur       = Screen::GAMES_MENU;
     uint8_t  brightness = 4;                       // BrightnessModel::DEFAULT_LEVEL
@@ -139,6 +156,16 @@ private:
 
     WeatherData weather;
     uint32_t    weatherEnteredMs = 0;
+
+    // Scroll pacing for the address. Slower than a menu label: this is a string
+    // you are copying down digit by digit, not one you are skimming.
+    static const uint16_t IP_DWELL_MS = 900;
+    static const uint8_t  IP_PPS      = 17;   // px/sec
+    static const uint8_t  IP_GAP_PX   = 8;    // blank gap between wrap repeats
+
+    uint8_t  ip[4]  = { 0, 0, 0, 0 };
+    bool     ipValid = false;
+    uint32_t ipEnteredMs = 0;
 
     OtaPhase otaSt  = OtaPhase::IDLE;
     bool     otaYes = false;    // CONFIRM defaults to NO — this reflashes the device

@@ -98,6 +98,14 @@ public:
         ui.setUnit(u ? TempUnit::FAHRENHEIT : TempUnit::CELSIUS);
     }
 
+    // Stands in for the firmware's WiFi, so the IP screen can be seen and
+    // reviewed in the simulator like every other screen.
+    void setIpAddress(int a, int b, int c, int d) {
+        ui.setIpAddress((uint8_t)a, (uint8_t)b, (uint8_t)c, (uint8_t)d);
+    }
+    void setNetworkDown() { ui.setNetworkDown(); }
+    bool hasIpAddress()   { return ui.hasIpAddress(); }
+
     // OTA. The browser has no flash to write, so it stands in for the firmware:
     // otaRequested() goes true when the user confirms, and the page (or the node
     // harness) drives the progress and the verdict back in. That means the whole
@@ -141,6 +149,9 @@ EMSCRIPTEN_BINDINGS(leddite_module) {
         .function("setPlaceIndex",       &DeviceUIWrapper::setPlaceIndex)
         .function("setUnit",             &DeviceUIWrapper::setUnit)
         .function("setWeather",          &DeviceUIWrapper::setWeather)
+        .function("setIpAddress",        &DeviceUIWrapper::setIpAddress)
+        .function("setNetworkDown",      &DeviceUIWrapper::setNetworkDown)
+        .function("hasIpAddress",        &DeviceUIWrapper::hasIpAddress)
         .function("otaRequested",        &DeviceUIWrapper::otaRequested)
         .function("clearOtaRequest",     &DeviceUIWrapper::clearOtaRequest)
         .function("otaPhase",            &DeviceUIWrapper::otaPhase)

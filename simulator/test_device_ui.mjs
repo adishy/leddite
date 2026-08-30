@@ -20,7 +20,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 // Mirrors UiController::Screen
 const S = {
   GAMES_MENU: 0, GAME_PLAYING: 1, SETTINGS_MENU: 2,
-  BRIGHTNESS_EDIT: 3, PLACES_MENU: 4, UNITS_EDIT: 5, WEATHER: 6, UPDATE: 7,
+  BRIGHTNESS_EDIT: 3, PLACES_MENU: 4, UNITS_EDIT: 5, WEATHER: 6,
+  IP_VIEW: 7, UPDATE: 8,
 };
 // Mirrors UiController::OtaPhase
 const OTA = { IDLE: 0, CONFIRM: 1, RUNNING: 2, SUCCEEDED: 3, FAILED: 4 };
@@ -141,6 +142,37 @@ test('CYCLE ALL advances through every game', () => {
   ui.delete();
 });
 
+test('the IP screen shows an address through the committed artifact', () => {
+  const ui = new mod.DeviceUI();
+  ui.setIpAddress(192, 168, 0, 113);
+  ui.enterSettings(0);
+
+  let guard = 0;
+  while (ui.screen() === S.SETTINGS_MENU && guard++ < 10) {
+    ui.press(0);
+    if (ui.screen() === S.IP_VIEW) break;
+    ui.longPress(0);
+    ui.turn(1, 0);
+  }
+  eq(ui.screen(), S.IP_VIEW, 'never reached the IP screen');
+  ui.tick(0);
+  const shown = frame(mod, ui);
+  check(anyLit(shown), 'the IP screen rendered blank');
+
+  // A different address has to look different, or the screen is decorative.
+  ui.setIpAddress(10, 0, 42, 7);
+  ui.tick(0);
+  check(!same(shown, frame(mod, ui)), 'the screen ignored the address');
+
+  // Offline must not keep showing the last address — that is exactly the one
+  // somebody would then try to OTA to.
+  ui.setNetworkDown();
+  check(!ui.hasIpAddress(), 'still claims an address while offline');
+  ui.tick(0);
+  check(anyLit(frame(mod, ui)), 'the offline state rendered blank');
+  ui.delete();
+});
+
 test('the OTA flow runs end to end through the committed artifact', () => {
   // The browser has no flash to write, so it plays the firmware's part: the
   // page confirms, then feeds progress and a verdict back in. Everything except
@@ -150,7 +182,7 @@ test('the OTA flow runs end to end through the committed artifact', () => {
 
   // Walk to the UPDATE row.
   let guard = 0;
-  while (ui.screen() === S.SETTINGS_MENU && guard++ < 8) {
+  while (ui.screen() === S.SETTINGS_MENU && guard++ < 10) {
     ui.press(0);
     if (ui.screen() === S.UPDATE) break;
     ui.longPress(0);

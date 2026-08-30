@@ -41,6 +41,11 @@ public:
     // Weather data arrives from WeatherClient and is forwarded to the controller.
     void setWeather(const WeatherData& d) { ui.setWeather(d); }
 
+    // Pushes the current WiFi address (or its absence) into the controller, which
+    // is Arduino-free and so cannot ask WiFi itself. Cheap enough to call every
+    // loop: it only touches the controller when the address actually changes.
+    void refreshNetworkStatus();
+
     uint8_t  brightnessLevel() const { return ui.brightnessLevel(); }
     uint8_t  placeIndex()      const { return ui.placeIndex(); }
     TempUnit unit()            const { return ui.unit(); }

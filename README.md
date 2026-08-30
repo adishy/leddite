@@ -37,7 +37,7 @@ press to select.
 | Timer | **TM** | Encoder sets minutes (1–90), progress-bar countdown |
 | Characters | **OC** | Animated Pac-Man ghost; press cycles 5 colour palettes |
 | Game Screensavers | **GS** | Auto-playing Snake, Space Invaders, Dino Jump, Pong, Brick Breaker, or Cycle All |
-| Settings | **ST** | Brightness (1–10), weather place, temperature units — persisted to NVS — and OTA firmware update |
+| Settings | **ST** | Brightness (1–10), weather place, temperature units (persisted to NVS), the device's IP address, and OTA firmware update |
 
 **Universal gestures**
 - Long press (3 s) → back to boot menu from any mode

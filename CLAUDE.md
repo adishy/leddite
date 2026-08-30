@@ -123,7 +123,21 @@ tools/gen-wifi-credentials.sh [path-to-env-file]
 
 `Settings → UPDATE` pulls a new image from a URL and writes it to the other app
 slot. The confirmation always opens on **NO**, and the device only ever fetches —
-nothing listens (`docs/adr/0014`).
+nothing listens (`docs/adr/0014`). `Settings → IP` shows the device's address,
+scrolling in the 5×7 font; you cannot point an update at a device whose address
+you do not know.
+
+**The device connects *to your machine*, which most desktop firewalls drop by
+default.** On this repo's Linux box `ufw` is active with
+`DEFAULT_INPUT_POLICY="DROP"`, and the fetch fails as
+`[OTA] failed (-1): HTTP error: connection refused` — a timeout surfaced under
+that name. Ping is not a useful check: `ufw` permits ICMP while dropping TCP, so
+the device pings fine and still cannot fetch. `ufw`'s logging is also rate
+limited, so the blocked SYN may not even appear in `/var/log/ufw.log`.
+
+```bash
+sudo ufw allow 8123/tcp comment 'leddite OTA image server'
+```
 
 ```bash
 tools/gen-ota-config.sh [path-to-env-file]     # writes esp32_firmware/ota_config.h (gitignored)

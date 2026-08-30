@@ -238,6 +238,11 @@ void loop() {
     weatherClient.setPlace(uiMode.placeIndex());
     networkMode.setBrightnessCap(BrightnessModel::levelToFastLED(uiMode.brightnessLevel()));
 
+    // The IP is shown under Settings -> IP; you cannot OTA a device whose
+    // address you do not know, and it is otherwise only ever printed to a serial
+    // console nobody has attached.
+    uiMode.refreshNetworkStatus();
+
     // ── OTA ───────────────────────────────────────────────────────────────────
     // tick() marks a freshly-written image valid once the device has stayed up
     // and connected — until it does, a bad image rolls back on the next reboot

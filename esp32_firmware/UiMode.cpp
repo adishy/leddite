@@ -2,6 +2,7 @@
 #include "BrightnessModel.h"
 #include <Arduino.h>
 #include <FastLED.h>
+#include <WiFi.h>
 
 // NVS namespace and keys. Keys are <=15 chars (an NVS limit).
 static const char* NVS_NS     = "leddite";
@@ -55,6 +56,12 @@ void UiMode::persistIfDirty() {
                   ui.brightnessLevel(),
                   Places::get(ui.placeIndex()).code,
                   ui.unit() == TempUnit::FAHRENHEIT ? 'F' : 'C');
+}
+
+void UiMode::refreshNetworkStatus() {
+    if (WiFi.status() != WL_CONNECTED) { ui.setNetworkDown(); return; }
+    const IPAddress a = WiFi.localIP();
+    ui.setIpAddress(a[0], a[1], a[2], a[3]);
 }
 
 // ── Entry points ──────────────────────────────────────────────────────────────
