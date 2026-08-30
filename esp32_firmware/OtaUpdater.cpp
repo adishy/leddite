@@ -24,7 +24,7 @@
 // run and rollback can never trigger.
 extern "C" bool verifyRollbackLater() { return true; }
 
-static bool       s_inProgress = false;
+static volatile bool s_inProgress = false;   // read from the WeatherClient task
 static bool       s_confirmed  = false;
 static uint32_t   s_bootMs     = 0;
 static WebServer* s_server     = nullptr;
@@ -175,11 +175,16 @@ static void onUploadData() {
         // stalls the instruction cache, and repainting on every chunk turns
         // that into visible flicker for no extra information.
         if (s_expected > 0 && s_ui && s_canvas) {
-            const uint8_t pct =
-                (uint8_t)(((uint64_t)up.totalSize * 100) / s_expected);
-            if (pct != s_lastPct && pct <= 100) {
+            // Clamp wide, then narrow. Content-Length is client-supplied: one
+            // that understates the body yields a raw value above 100, and
+            // casting first would alias it back into range (300 -> 44) and slip
+            // past a <= 100 check.
+            uint64_t raw = ((uint64_t)up.totalSize * 100) / s_expected;
+            if (raw > 100) raw = 100;
+            const uint8_t pct = (uint8_t)raw;
+            if (pct != s_lastPct) {
                 s_lastPct = pct;
-                s_ui->setOtaProgress(pct);
+                s_ui->setOtaProgress(pct, millis());
                 paintPanel(*s_ui, *s_canvas);
             }
         }
@@ -190,6 +195,17 @@ static void onUploadData() {
         if (up.status == UPLOAD_FILE_ABORTED) {
             Update.abort();
             Serial.println("[OTA] upload aborted by client");
+            // The verdict MUST be reported from here, not from onUploadDone.
+            // WebServer::_parseFormUploadAborted() calls this handler and then
+            // returns false, which propagates up through _parseRequest so
+            // handleClient() never reaches _handleRequest() — onUploadDone does
+            // not run on any abort path. Without this the panel keeps a frozen
+            // percentage forever: RUNNING is deliberately inescapable by either
+            // gesture, so nothing else can clear it.
+            if (s_ui) {
+                s_ui->setOtaResult(false);
+                if (s_canvas) paintPanel(*s_ui, *s_canvas);
+            }
         }
         s_inProgress = false;
     }
@@ -266,5 +282,19 @@ void OtaUpdater::service(UiController& ui, Canvas& canvas) {
                          phase == UiController::OtaPhase::RUNNING);
 
     if (!wanted) { closeWindow(); return; }
-    if (s_server) s_server->handleClient();
+    if (!s_server) return;
+
+    s_server->handleClient();
+
+    // Belt and braces. UPLOAD_FILE_ABORTED covers most abort paths but not all:
+    // a malformed multipart line makes _parseForm() return false without ever
+    // calling the upload handler. If handleClient() has returned and no write
+    // is in flight, the transfer is over — so RUNNING with nothing running is a
+    // write that died without a verdict. (A success never gets here: it reboots
+    // inside onUploadDone.)
+    if (!s_inProgress && ui.otaPhase() == UiController::OtaPhase::RUNNING) {
+        Serial.println("[OTA] upload ended without a verdict — failing it");
+        ui.setOtaResult(false);
+        paintPanel(ui, canvas);
+    }
 }

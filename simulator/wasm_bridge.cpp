@@ -117,7 +117,7 @@ public:
     void clearOtaRequest() { ui.clearOtaRequest(); }
     int  otaPhase()      { return (int)ui.otaPhase(); }
     int  otaProgress()   { return ui.otaProgress(); }
-    void setOtaProgress(int pct) { ui.setOtaProgress((uint8_t)pct); }
+    void setOtaProgress(int pct, uint32_t nowMs) { ui.setOtaProgress((uint8_t)pct, nowMs); }
     void setOtaResult(bool ok)   { ui.setOtaResult(ok); }
 
     // Stands in for WeatherClient, which only exists on the firmware side.

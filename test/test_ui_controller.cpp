@@ -148,7 +148,7 @@ void test_update_is_not_cancellable_mid_write() {
     ui.clearOtaRequest();
     // The upload has started: the firmware reports bytes, which is what moves
     // the screen from waiting to writing.
-    ui.setOtaProgress(1);
+    ui.setOtaProgress(1, 0);
     ASSERT_EQ((int)ui.otaPhase(), (int)OtaPhase::RUNNING, "not running");
 
     // Backing out here would leave a half-written slot with the UI claiming
@@ -162,6 +162,40 @@ void test_update_is_not_cancellable_mid_write() {
     PASS();
 }
 
+void test_a_stalled_write_cannot_hang_the_panel_forever() {
+    TEST("a write that stops reporting fails itself instead of freezing");
+    openUpdate();
+    ui.turn(1, 0);
+    ui.press(0);
+    ui.clearOtaRequest();
+    ui.setOtaProgress(37, 1000);
+    ASSERT_EQ((int)ui.otaPhase(), (int)OtaPhase::RUNNING, "not running");
+
+    // RUNNING is the one phase neither gesture can leave — that is deliberate,
+    // because abandoning a half-written slot is worse than waiting. It is also
+    // what makes a transport that dies silently unrecoverable: the ESP32
+    // WebServer never runs its completion handler on an abort, so without a
+    // timeout here the panel keeps a frozen percentage until the power is cut.
+    ui.press(0);
+    ui.longPress(0);
+    ASSERT_EQ((int)ui.otaPhase(), (int)OtaPhase::RUNNING, "a gesture escaped a write");
+
+    // Still reporting: still alive, however long it takes.
+    ui.update(1000 + UiController::OTA_STALL_MS - 1);
+    ASSERT_EQ((int)ui.otaPhase(), (int)OtaPhase::RUNNING, "gave up on a live write");
+    ui.setOtaProgress(38, 1000 + UiController::OTA_STALL_MS - 1);
+    ui.update(1000 + 2 * UiController::OTA_STALL_MS - 2);
+    ASSERT_EQ((int)ui.otaPhase(), (int)OtaPhase::RUNNING,
+              "a fresh report did not reset the stall clock");
+
+    // Silence for the whole window: declare it dead, and let the user out.
+    ui.update(1000 + 2 * UiController::OTA_STALL_MS);
+    ASSERT_EQ((int)ui.otaPhase(), (int)OtaPhase::FAILED, "a dead write never gave up");
+    ui.press(0);
+    ASSERT_EQ((int)ui.screen(), (int)Screen::SETTINGS_MENU, "no way back to the menu");
+    PASS();
+}
+
 void test_update_progress_and_results() {
     TEST("progress clamps, and both verdicts are exits");
     openUpdate();
@@ -169,11 +203,11 @@ void test_update_progress_and_results() {
     ui.press(0);
     ui.clearOtaRequest();
 
-    ui.setOtaProgress(0);
+    ui.setOtaProgress(0, 0);
     ASSERT_EQ(ui.otaProgress(), 0u, "0% not accepted");
-    ui.setOtaProgress(57);
+    ui.setOtaProgress(57, 0);
     ASSERT_EQ(ui.otaProgress(), 57u, "57% not accepted");
-    ui.setOtaProgress(200);
+    ui.setOtaProgress(200, 0);
     ASSERT_EQ(ui.otaProgress(), 100u, "progress above 100 was not clamped");
 
     ui.setOtaResult(false);
@@ -206,7 +240,7 @@ void test_update_screens_all_render() {
     ui.press(0);
     ui.clearOtaRequest();
     for (uint8_t pct = 0; pct <= 100; pct = (uint8_t)(pct + 5)) {
-        ui.setOtaProgress(pct);
+        ui.setOtaProgress(pct, 0);
         ui.render(buf, 0);
         ASSERT(litPixels() > 3, "a progress frame rendered nearly blank");
     }
@@ -378,7 +412,7 @@ void test_screens_survive_the_lowest_brightness() {
     // The bar occupies rows 10-12; the percentage digit sits well above it.
     static const uint8_t BAR_Y0 = 10, BAR_Y1 = 12;
 
-    ui.setOtaProgress(0);
+    ui.setOtaProgress(0, 0);
     ui.render(buf, 0);
     const uint16_t bar0 = litRowsAfterScaling(BAR_Y0, BAR_Y1);
     // A 1px fill floor alone is 3 pixels. The empty track has to contribute
@@ -386,7 +420,7 @@ void test_screens_survive_the_lowest_brightness() {
     ASSERT(bar0 >= 6, "the empty progress track vanishes at the lowest brightness");
 
     // And it must still grow, or the bar conveys nothing at level 1.
-    ui.setOtaProgress(70);
+    ui.setOtaProgress(70, 0);
     ui.render(buf, 0);
     ASSERT(litRowsAfterScaling(BAR_Y0, BAR_Y1) > bar0,
            "the bar does not fill at the lowest brightness");
@@ -525,6 +559,7 @@ int main() {
     test_waiting_window_is_cancellable_and_expires();
     test_waiting_screen_shows_the_url();
     test_update_is_not_cancellable_mid_write();
+    test_a_stalled_write_cannot_hang_the_panel_forever();
     test_update_progress_and_results();
     test_update_screens_all_render();
     test_ip_screen_shows_every_octet();

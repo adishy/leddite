@@ -84,8 +84,14 @@ public:
 
     // Call every loop(). Opens the upload window when the panel asks for it,
     // pumps the HTTP server while it is open, and closes it again as soon as
-    // the UI leaves the waiting/running phases. Non-blocking; the upload itself
-    // runs inside handleClient().
+    // the UI leaves the waiting/running phases.
+    //
+    // NOT non-blocking during a transfer: WebServer::handleClient() parses a
+    // whole multipart POST synchronously, so this call does not return until
+    // the upload finishes, aborts or times out at the socket. Nothing else in
+    // loop() runs meanwhile — including UiController::update(), which is why
+    // OTA_WINDOW_MS cannot fire mid-upload and why the panel is repainted from
+    // inside the upload callback rather than by the usual frame loop.
     static void service(UiController& ui, Canvas& canvas);
 
     // True while a flash write is in flight — WeatherClient uses this to stay

@@ -331,6 +331,15 @@ void UiController::update(uint32_t nowMs) {
         return;
     }
 
+    // A write that stops reporting is a write that is not happening. Neither
+    // gesture can leave RUNNING, so if the transport dies without a verdict the
+    // panel is stuck until the power goes — see OTA_STALL_MS.
+    if (cur == Screen::UPDATE && otaSt == OtaPhase::RUNNING &&
+        (uint32_t)(nowMs - otaProgressMs) >= OTA_STALL_MS) {
+        setOtaResult(false);
+        return;
+    }
+
     if (cur != Screen::GAME_PLAYING) return;
 
     if (cycleAll && (uint32_t)(nowMs - cycleStartMs) >= CYCLE_INTERVAL_MS) {
@@ -446,8 +455,11 @@ void UiController::renderIp(uint8_t* buf, uint32_t nowMs) const {
 
 // ── OTA ───────────────────────────────────────────────────────────────────────
 
-void UiController::setOtaProgress(uint8_t pct) {
+void UiController::setOtaProgress(uint8_t pct, uint32_t nowMs) {
     otaPct = pct > 100 ? 100 : pct;
+    // Every report is also a sign of life; update() fails the write if these
+    // stop arriving (OTA_STALL_MS).
+    otaProgressMs = nowMs;
     // A progress report is also the firmware saying "I am still writing", which
     // is the only thing that can move the screen back out of a stale result.
     if (otaSt != OtaPhase::RUNNING) {

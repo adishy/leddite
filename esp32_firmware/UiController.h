@@ -86,6 +86,21 @@ public:
     // from becoming true for the device's whole uptime (docs/adr/0014).
     static const uint32_t OTA_WINDOW_MS = 300000;   // 5 minutes
 
+    // How long a write may go without the firmware reporting a byte before the
+    // panel calls it dead.
+    //
+    // RUNNING is deliberately inescapable by either gesture — you cannot abandon
+    // a half-written slot — so it is the one phase that MUST NOT be able to
+    // outlive its transport. It can: the ESP32 WebServer notifies its upload
+    // handler with UPLOAD_FILE_ABORTED on most abort paths but not all (a
+    // malformed multipart line returns without calling it at all), and it never
+    // runs the completion handler on any of them. Without this the panel sits on
+    // a frozen percentage until someone pulls the power.
+    //
+    // Far longer than any real gap: progress arrives per whole percent, about
+    // every 12 KB, which is ~0.2 s at the 72 KB/s measured on hardware.
+    static const uint32_t OTA_STALL_MS = 60000;
+
     // How long each game runs before "CYCLE ALL" advances to the next.
     static const uint32_t CYCLE_INTERVAL_MS = 20000;
 
@@ -155,7 +170,7 @@ public:
     void     clearOtaRequest()     { otaReq = false; }
     OtaPhase otaPhase()      const { return otaSt; }
     uint8_t  otaProgress()   const { return otaPct; }
-    void     setOtaProgress(uint8_t pct);
+    void     setOtaProgress(uint8_t pct, uint32_t nowMs);
     void     setOtaResult(bool ok);
 
 private:
@@ -215,7 +230,8 @@ private:
     bool     otaYes = false;    // CONFIRM defaults to NO — this reflashes the device
     bool     otaReq = false;
     uint8_t  otaPct = 0;
-    uint32_t otaWindowMs = 0;   // when WAITING began, for the timeout and scroll
+    uint32_t otaWindowMs   = 0; // when WAITING began, for the timeout and scroll
+    uint32_t otaProgressMs = 0; // last sign of life from the write
 };
 
 #endif // UI_CONTROLLER_H

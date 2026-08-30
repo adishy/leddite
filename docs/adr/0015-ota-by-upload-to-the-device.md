@@ -63,7 +63,28 @@ The window here is not that. It exists only after a person turns a knob to YES
 and presses it, closes on the next press, on a long-press, on completion, and on
 a five-minute timeout (`UiController::OTA_WINDOW_MS`, enforced in
 `UiController::update()` and tested). Physical presence remains the
-authentication factor. The property 0014 cared about survives; the cost it
+authentication factor.
+
+**The five minutes bound the wait, not the transfer.** `handleClient()` parses a
+multipart POST synchronously, so once an upload is accepted nothing else in
+`loop()` runs — `update()` included — and the transfer is bounded by the socket's
+own timeouts. A review caught the consequence: a client that dies mid-upload
+leaves `RUNNING`, which is deliberately inescapable by either gesture, with no
+one to report a verdict. `WebServer` notifies the upload handler with
+`UPLOAD_FILE_ABORTED` on most abort paths but **never** runs the completion
+handler on any of them, and a malformed multipart line skips the upload handler
+too. The panel would sit on a frozen percentage until the power was pulled.
+
+Three layers now close that, cheapest first:
+
+1. The `UPLOAD_FILE_ABORTED` branch reports the failure itself, rather than
+   relying on a completion handler that will not run.
+2. `service()` treats "`handleClient()` returned, no write in flight, still
+   `RUNNING`" as a write that died without a verdict.
+3. `UiController::OTA_STALL_MS` (60 s without a byte reported) fails the write
+   from inside the state machine, so the property holds even if the firmware
+   half is wrong. This is the only one of the three that is unit-tested — the
+   other two are Arduino-only — which is exactly why it exists. The property 0014 cared about survives; the cost it
 avoided — 17 KB — turned out to buy a feature that works.
 
 ### Cost

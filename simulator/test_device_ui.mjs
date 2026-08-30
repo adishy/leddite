@@ -248,7 +248,7 @@ test('the OTA flow runs end to end through the committed artifact', () => {
   check(!same(waitEarly, frame(mod, ui)), 'the URL never scrolled');
 
   // Bytes arriving is what turns waiting into writing.
-  ui.setOtaProgress(1);
+  ui.setOtaProgress(1, 0);
   eq(ui.otaPhase(), OTA.RUNNING, 'progress did not enter the writing screen');
 
   // A running write is not cancellable from either gesture.
@@ -257,10 +257,10 @@ test('the OTA flow runs end to end through the committed artifact', () => {
   eq(ui.otaPhase(), OTA.RUNNING, 'an input escaped a running update');
 
   // Progress must actually move pixels, or the panel looks hung.
-  ui.setOtaProgress(5);
+  ui.setOtaProgress(5, 0);
   ui.tick(0);
   const early = frame(mod, ui);
-  ui.setOtaProgress(85);
+  ui.setOtaProgress(85, 0);
   ui.tick(0);
   check(!same(early, frame(mod, ui)), 'the progress bar did not move');
 
