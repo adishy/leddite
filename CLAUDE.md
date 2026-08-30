@@ -110,7 +110,8 @@ That takes each OTA app slot from 0x140000 to 0x1E0000, and this build from 91%
 of a slot to **61%**. Omitting the flag silently reverts to the smaller layout.
 Nothing here uses SPIFFS, and `nvs` is at 0x9000/0x5000 in both schemes so saved
 settings survive the switch. **The first flash after this change must be over
-USB** — a partition table is not part of an OTA payload. See `docs/adr/0014`.
+USB** — a partition table is not part of an OTA payload. See `docs/adr/0014`
+(partitions and rollback) and `docs/adr/0015` (the update flow itself).
 
 WiFi credentials go in `esp32_firmware/wifi_credentials.h` (gitignored). Generate
 it from `LEDDITE_SSID` / `LEDDITE_PASSWORD` without echoing the values:

@@ -46,29 +46,78 @@ const char* WIFI_PASSWORD = "your-password";
 
 ## Compile
 
-From the repo root:
+From the repo root. **Sync the duplicated core modules first** — the Arduino
+toolchain cannot see `../src`, so those files exist twice and building without
+syncing flashes logic no test covered (`RULES.md` §2):
 
 ```bash
-"/Applications/Arduino IDE.app/Contents/Resources/app/lib/backend/resources/arduino-cli" \
-  compile -b esp32:esp32:esp32 esp32_firmware/esp32_firmware.ino
+tools/sync-firmware-copies.sh
 ```
+
+**`PartitionScheme=min_spiffs` is mandatory.** It gives two 0x1E0000 app slots
+instead of two 0x140000, taking this build from 91% of a slot to ~62% and
+leaving room for OTA. Omitting it silently builds for the smaller layout.
+
+```bash
+arduino-cli compile -b esp32:esp32:esp32:PartitionScheme=min_spiffs \
+  --output-dir build/fw esp32_firmware/esp32_firmware.ino
+```
+
+On macOS, Arduino IDE 2.x bundles `arduino-cli` at
+`/Applications/Arduino IDE.app/Contents/Resources/app/lib/backend/resources/arduino-cli`.
 
 ---
 
-## Flash
+## Flash over USB
 
-Find the ESP32 port (usually `/dev/cu.usbserial-0001` on macOS):
+Needed for the first flash, after any partition-scheme change, and whenever the
+device has no working WiFi. Otherwise prefer OTA (below).
 
-```bash
-ls /dev/cu.usbserial*
-```
-
-Flash:
+Find the port — `/dev/ttyUSB0` on Linux, usually `/dev/cu.usbserial-0001` on
+macOS:
 
 ```bash
-"/Applications/Arduino IDE.app/Contents/Resources/app/lib/backend/resources/arduino-cli" \
-  upload -p /dev/cu.usbserial-0001 -b esp32:esp32:esp32 esp32_firmware/esp32_firmware.ino
+arduino-cli board list
+arduino-cli upload -p /dev/ttyUSB0 -b esp32:esp32:esp32:PartitionScheme=min_spiffs \
+  --input-dir build/fw esp32_firmware/esp32_firmware.ino
 ```
+
+On Linux you must be in the `dialout` group (`id -nG | grep dialout`).
+
+---
+
+## Flash over the air
+
+**The device does not fetch anything — you upload to it.** At the panel:
+`Settings → UPDATE`, turn to **YES**, press. It scrolls the URL to browse to
+(e.g. `HTTP://192.168.0.113`); open that, drop `build/fw/esp32_firmware.ino.bin`
+on the page, press Install.
+
+No image server, nothing to configure, no firewall rule — the connection runs
+browser → device. The window closes on the next press, on a long-press, on
+completion, or after five minutes.
+
+From a script, with nobody at the encoder:
+
+```bash
+curl -s http://<ip>/info                                   # {"version":...,"slot":...}
+curl -sf -F "f=@build/fw/esp32_firmware.ino.bin" http://<ip>/update    # prints OK
+```
+
+That needs the window already open — build once with
+`--build-property "compiler.cpp.extra_flags=-DLEDDITE_TEST_OTA_ON_BOOT"` and the
+device opens it at the end of `setup()`.
+
+**You have not succeeded until the slot changes and the image is marked valid:**
+
+```
+Firmware 2.2.0 on app1 (pending verify)
+[OTA] image on app1 marked valid after 30s healthy
+```
+
+`(pending verify)` means probation — an image that cannot stay booted and
+connected for 30 s reverts to the previous slot by itself. See
+[`docs/adr/0015`](../docs/adr/0015-ota-by-upload-to-the-device.md).
 
 ---
 
@@ -80,9 +129,12 @@ On boot the firmware:
 3. Syncs NTP time (Eastern Time, auto-DST).
 4. **Flashes the entire display solid green for 500 ms** once ready.
 5. Shows the **boot menu** on the LED panel — rotate encoder to select:
-   - `CK` — Clock + Calendar (NTP time / scrolling date)
+   - `CK` — Clock + Calendar (NTP time / scrolling date / weather)
    - `NT` — Network Canvas (WebSocket binary protocol, port 81)
-   - `TM` — Visual Timer (rotary encoder sets minutes)
+   - `TM` — Timer (rotary encoder sets minutes)
+   - `OC` — Octopus (animated character)
+   - `GM` — Games (Snake, Invaders, Dino, Pong, Bricks, or cycle all)
+   - `ST` — Settings (brightness, weather place, units, IP, UPDATE)
 6. Press encoder to enter selected mode. Press again to return to menu.
    In Network Canvas mode: long-press (2s) to return to menu.
 
