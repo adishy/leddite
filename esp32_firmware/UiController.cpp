@@ -36,6 +36,12 @@ enum : uint8_t {
     SET_BRIGHTNESS = 0, SET_PLACE = 1, SET_UNITS = 2, SET_IP = 3, SET_UPDATE = 4
 };
 
+// The firmware's boot-time test seam turns this many clicks to reach UPDATE.
+// Reordering SETTINGS_ITEMS without moving the constant would silently point
+// the seam at PLACE, so the two are pinned together here.
+static_assert(SET_UPDATE == UiController::SETTINGS_UPDATE_INDEX,
+              "SETTINGS_UPDATE_INDEX must match UPDATE's slot in SETTINGS_ITEMS");
+
 // ── Construction ──────────────────────────────────────────────────────────────
 
 UiController::UiController() {
@@ -59,17 +65,20 @@ void UiController::buildPlacesMenu() {
 // ── Entry points ──────────────────────────────────────────────────────────────
 
 void UiController::enterGames(uint32_t nowMs) {
+    menuAccum = 0;
     cur      = Screen::GAMES_MENU;
     cycleAll = false;
     gamesMenu.begin(GAME_ITEMS, GAME_COUNT, 0, nowMs);
 }
 
 void UiController::enterSettings(uint32_t nowMs) {
+    menuAccum = 0;
     cur = Screen::SETTINGS_MENU;
     settingsMenu.begin(SETTINGS_ITEMS, SETTINGS_COUNT, 0, nowMs);
 }
 
 void UiController::enterWeather(uint32_t nowMs) {
+    menuAccum = 0;
     cur              = Screen::WEATHER;
     weatherEnteredMs = nowMs;
 }
@@ -102,6 +111,29 @@ void UiController::startGame(uint8_t gameIndex, uint32_t nowMs) {
 
 // ── Input ─────────────────────────────────────────────────────────────────────
 
+bool UiController::screenIsList() const {
+    return cur == Screen::GAMES_MENU || cur == Screen::SETTINGS_MENU ||
+           cur == Screen::PLACES_MENU;
+}
+
+void UiController::encoderTurn(int detents, uint32_t nowMs) {
+    if (detents == 0) return;
+
+    // Value editors and the games take the knob raw: one click is one level, one
+    // unit, one game, in the direction you turned. Only the vertical lists get
+    // the transform below.
+    if (!screenIsList()) { turn(detents, nowMs); return; }
+
+    // Integer division truncates toward zero in both directions, so a detent
+    // either side of centre needs no special case: -1/2 and 1/2 are both 0, and
+    // the remainder keeps its sign.
+    menuAccum = (int8_t)(menuAccum + detents);
+    const int steps = menuAccum / MENU_DETENTS_PER_ROW;
+    menuAccum = (int8_t)(menuAccum - steps * MENU_DETENTS_PER_ROW);
+
+    if (steps) turn(-steps, nowMs);         // inverted: the list moves, not the cursor
+}
+
 void UiController::turn(int delta, uint32_t nowMs) {
     if (delta == 0) return;
 
@@ -118,6 +150,8 @@ void UiController::turn(int delta, uint32_t nowMs) {
                 cycleStartMs = nowMs;
                 startGame(cycleIndex, nowMs);
             } else {
+                // Not a list on screen: skipping games stays one click per game,
+                // and in the direction the knob turns.
                 gamesMenu.turn(delta, nowMs);
                 if (gamesMenu.selected() != CYCLE_INDEX) startGame(gamesMenu.selected(), nowMs);
             }
@@ -153,6 +187,7 @@ void UiController::turn(int delta, uint32_t nowMs) {
 }
 
 void UiController::press(uint32_t nowMs) {
+    menuAccum = 0;          // a part-turn does not carry into the next screen
     switch (cur) {
         case Screen::GAMES_MENU: {
             const uint8_t sel = gamesMenu.selected();
@@ -212,15 +247,21 @@ void UiController::press(uint32_t nowMs) {
         case Screen::UPDATE:
             switch (otaSt) {
                 case OtaPhase::CONFIRM:
-                    if (otaYes) {
-                        otaReq = true;                 // the firmware picks this up
-                        otaSt  = OtaPhase::RUNNING;
-                        otaPct = 0;
+                    if (otaYes && ipValid) {
+                        otaReq      = true;            // firmware: open the window
+                        otaSt       = OtaPhase::WAITING;
+                        otaWindowMs = nowMs;
+                        otaPct      = 0;
+                    } else if (otaYes) {
+                        // Nowhere to browse to. Failing here is honest; opening a
+                        // window on an address that does not exist is not.
+                        otaSt = OtaPhase::FAILED;
                     } else {
                         otaSt = OtaPhase::IDLE;
                         cur   = Screen::SETTINGS_MENU;
                     }
                     break;
+                case OtaPhase::WAITING:            // give up waiting
                 case OtaPhase::SUCCEEDED:
                 case OtaPhase::FAILED:
                     otaSt = OtaPhase::IDLE;
@@ -239,6 +280,7 @@ void UiController::press(uint32_t nowMs) {
 }
 
 bool UiController::longPress(uint32_t nowMs) {
+    menuAccum = 0;
     switch (cur) {
         // Root screens: nowhere further up, so the caller returns to the main menu.
         case Screen::GAMES_MENU:
@@ -279,6 +321,16 @@ bool UiController::longPress(uint32_t nowMs) {
 // ── Frame ─────────────────────────────────────────────────────────────────────
 
 void UiController::update(uint32_t nowMs) {
+    // An upload window that nobody used must close itself. Leaving it open
+    // because the user wandered off is exactly how "nothing listens" quietly
+    // stops being true (docs/adr/0014).
+    if (cur == Screen::UPDATE && otaSt == OtaPhase::WAITING &&
+        (uint32_t)(nowMs - otaWindowMs) >= OTA_WINDOW_MS) {
+        otaSt = OtaPhase::IDLE;
+        cur   = Screen::SETTINGS_MENU;
+        return;
+    }
+
     if (cur != Screen::GAME_PLAYING) return;
 
     if (cycleAll && (uint32_t)(nowMs - cycleStartMs) >= CYCLE_INTERVAL_MS) {
@@ -335,9 +387,22 @@ void UiController::drawWide(uint8_t* buf, const char* text, int16_t x, int16_t y
     }
 }
 
-int16_t UiController::ipScrollOffset(uint16_t textW, uint32_t nowMs) const {
+void UiController::formatIp(char* out) const {
+    uint8_t n = 0;
+    for (uint8_t i = 0; i < 4; i++) {
+        const uint8_t v = ip[i];
+        if (v >= 100) out[n++] = (char)('0' + v / 100);
+        if (v >= 10)  out[n++] = (char)('0' + (v / 10) % 10);
+        out[n++] = (char)('0' + v % 10);
+        if (i < 3) out[n++] = '.';
+    }
+    out[n] = 0;
+}
+
+int16_t UiController::ipScrollOffset(uint16_t textW, uint32_t nowMs,
+                                     uint32_t anchorMs) const {
     if (textW <= Draw::W) return 0;                    // fits: never scrolls
-    const uint32_t elapsed = nowMs - ipEnteredMs;
+    const uint32_t elapsed = nowMs - anchorMs;
     if (elapsed <= IP_DWELL_MS) return 0;              // dwell on the first octet
     const uint32_t travel = (uint32_t)textW + IP_GAP_PX;
     const uint32_t moved  = ((elapsed - IP_DWELL_MS) * IP_PPS) / 1000u;
@@ -366,19 +431,11 @@ void UiController::renderIp(uint8_t* buf, uint32_t nowMs) const {
     // gutter — the digits ran together, and on the panel this is a string you
     // copy down while looking away, where glyph size beats not having to wait.
     char text[16];
-    uint8_t n = 0;
-    for (uint8_t i = 0; i < 4; i++) {
-        const uint8_t v = ip[i];
-        if (v >= 100) text[n++] = (char)('0' + v / 100);
-        if (v >= 10)  text[n++] = (char)('0' + (v / 10) % 10);
-        text[n++] = (char)('0' + v % 10);
-        if (i < 3) text[n++] = '.';
-    }
-    text[n] = 0;
+    formatIp(text);
 
     static const uint8_t COL[3] = { 120, 245, 220 };
     const uint16_t w    = TextRenderer::textWidth(text);
-    const int16_t  xOff = ipScrollOffset(w, nowMs);
+    const int16_t  xOff = ipScrollOffset(w, nowMs, ipEnteredMs);
     const int16_t  y    = (int16_t)((16 - (int16_t)TextRenderer::CHAR_HEIGHT) / 2);
 
     drawWide(buf, text, xOff, y, COL);
@@ -405,7 +462,7 @@ void UiController::setOtaResult(bool ok) {
     cur    = Screen::UPDATE;
 }
 
-void UiController::renderUpdate(uint8_t* buf) const {
+void UiController::renderUpdate(uint8_t* buf, uint32_t nowMs) const {
     Draw::clear(buf);
 
     // Every state is a word, not a symbol: a 16x16 panel has no room for an icon
@@ -438,6 +495,31 @@ void UiController::renderUpdate(uint8_t* buf) const {
             Draw::rect(buf, 9, 13, 3, 2, otaYes ? GREEN[0] : 30,
                                           otaYes ? GREEN[1] : 30,
                                           otaYes ? GREEN[2] : 34);
+            break;
+        }
+
+        case OtaPhase::WAITING: {
+            // The whole point of this flow: the address you must browse to is on
+            // the panel in front of you, so the update needs no prior knowledge
+            // of the device and no server on your machine. The URL is shown
+            // whole — "HTTP://192.168.0.113" — because a bare dotted quad still
+            // leaves you guessing at the scheme and the port.
+            char url[24] = { 'H', 'T', 'T', 'P', ':', '/', '/', 0 };
+            formatIp(url + 7);
+
+            const uint16_t uw   = TextRenderer::textWidth(url);
+            const int16_t  xOff = ipScrollOffset(uw, nowMs, otaWindowMs);
+
+            drawWide(buf, url, xOff, 4, PINK);
+            if (uw > Draw::W)
+                drawWide(buf, url, (int16_t)(xOff + (int16_t)uw + IP_GAP_PX), 4, PINK);
+
+            // A slow sweep along the bottom: the window is open and timing out,
+            // and a moving pixel is the cheapest proof the device has not hung.
+            // Coverage, not brightness — see the RUNNING case below.
+            const uint32_t open = nowMs - otaWindowMs;
+            const int16_t  head = (int16_t)((open / 250u) % 16u);
+            Draw::px(buf, head, 14, PINK[0], PINK[1], PINK[2]);
             break;
         }
 
@@ -534,7 +616,7 @@ void UiController::render(uint8_t* buf, uint32_t nowMs) {
             break;
 
         case Screen::UPDATE:
-            renderUpdate(buf);
+            renderUpdate(buf, nowMs);
             break;
 
         case Screen::WEATHER:

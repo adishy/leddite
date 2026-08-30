@@ -4,40 +4,35 @@
 #include "Draw.h"
 
 #include <Arduino.h>
-#include <string.h>
 #include <WiFi.h>
-#include <WiFiClientSecure.h>
-#include <HTTPUpdate.h>
+#include <WebServer.h>
+#include <Update.h>
 #include <esp_ota_ops.h>
 #include <FastLED.h>
 
-// ota_config.h is generated and gitignored (tools/gen-ota-config.sh). Guarding
-// the include rather than requiring it means a fresh clone still compiles —
-// wifi_credentials.h already costs the build one required generator step and a
-// second one is a poor trade for a feature most clones will not use.
-#if __has_include("ota_config.h")
-  #include "ota_config.h"
-  #define LEDDITE_OTA_CONFIGURED 1
-#else
-  #define LEDDITE_OTA_CONFIGURED 0
-  #define LEDDITE_OTA_URL     ""
-  #define LEDDITE_OTA_USER    ""
-  #define LEDDITE_OTA_PASS    ""
-  #define LEDDITE_FW_VERSION  "dev"
+// Bump this when you cut an image. Overridable from the build so CI can stamp
+// one without editing a file:
+//   --build-property "compiler.cpp.extra_flags=-DLEDDITE_FW_VERSION=\"2.3.0\""
+#ifndef LEDDITE_FW_VERSION
+  #define LEDDITE_FW_VERSION "2.2.0"
 #endif
 
-// Defer the core's automatic "mark this image valid" until the device has proven
-// itself. This overrides the weak definition in cores/esp32/esp32-hal-misc.c,
-// which is compiled as C — hence the linkage specifier. Without it initArduino()
-// commits a new image before setup() has run and rollback can never trigger.
+// Defer the core's automatic "mark this image valid" until the device has
+// proven itself. This overrides the weak definition in
+// cores/esp32/esp32-hal-misc.c, which is compiled as C — hence the linkage
+// specifier. Without it initArduino() commits a new image before setup() has
+// run and rollback can never trigger.
 extern "C" bool verifyRollbackLater() { return true; }
 
-static bool     s_inProgress = false;
-static bool     s_confirmed  = false;
-static uint32_t s_bootMs     = 0;
+static bool       s_inProgress = false;
+static bool       s_confirmed  = false;
+static uint32_t   s_bootMs     = 0;
+static WebServer* s_server     = nullptr;
+static uint32_t   s_expected   = 0;   // Content-Length, for the panel's bar
+static uint8_t    s_lastPct    = 255;
 
-bool OtaUpdater::configured() { return LEDDITE_OTA_CONFIGURED; }
 bool OtaUpdater::inProgress() { return s_inProgress; }
+bool OtaUpdater::windowOpen() { return s_server != nullptr; }
 const char* OtaUpdater::version() { return LEDDITE_FW_VERSION; }
 
 const char* OtaUpdater::runningPartition() {
@@ -56,8 +51,8 @@ void OtaUpdater::tick() {
     if (s_confirmed) return;
     if (s_bootMs == 0) s_bootMs = millis();
 
-    // "Healthy" means it booted, joined the network and has been rendering for a
-    // while — not merely that setup() returned.
+    // "Healthy" means it booted, joined the network and has been rendering for
+    // a while — not merely that setup() returned.
     if (WiFi.status() != WL_CONNECTED) return;
     if ((uint32_t)(millis() - s_bootMs) < HEALTHY_AFTER_MS) return;
 
@@ -73,99 +68,203 @@ void OtaUpdater::tick() {
                   running->label, (unsigned long)(HEALTHY_AFTER_MS / 1000));
 }
 
-void OtaUpdater::run(UiController& ui, Canvas& canvas) {
-    // Render straight to the panel rather than going through UiMode's 30 FPS
-    // gate: this function blocks for the whole write, so the frame rate here is
-    // "whenever the percentage changes" and nothing else is going to draw.
+// ── The upload page ──────────────────────────────────────────────────────────
+// Served from flash as one string. No CDN, no framework: the whole point of
+// this flow is that it works with nothing but the device and a browser, and a
+// page that needs to fetch anything would defeat that on exactly the network
+// where you most need it.
+static const char PAGE[] PROGMEM = R"HTML(<!doctype html><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>Leddite firmware</title><style>
+:root{color-scheme:dark}
+body{margin:0;font:15px/1.5 system-ui,sans-serif;background:#12141a;color:#e7e9ee;
+display:flex;min-height:100vh;align-items:center;justify-content:center}
+.c{width:min(420px,92vw)}
+h1{font-size:19px;margin:0 0 4px}
+.m{color:#8b93a5;font-size:13px;margin-bottom:18px}
+label{display:block;border:1px dashed #39405280;border-radius:10px;padding:26px 16px;
+text-align:center;cursor:pointer;background:#191c24}
+label:hover{border-color:#ff78a0;background:#1d2029}
+input[type=file]{display:none}
+#n{margin-top:12px;font-size:13px;color:#8b93a5;min-height:19px;word-break:break-all}
+button{width:100%;margin-top:14px;padding:11px;border:0;border-radius:9px;
+background:#ff78a0;color:#12141a;font:600 15px system-ui;cursor:pointer}
+button:disabled{opacity:.4;cursor:default}
+#t{height:8px;border-radius:5px;background:#262a35;margin-top:16px;overflow:hidden;display:none}
+#b{height:100%;width:0;background:#ff78a0;transition:width .15s}
+#s{margin-top:10px;font-size:13px;min-height:19px}
+.ok{color:#5aeb78}.err{color:#ff5f52}
+</style>
+<div class=c>
+<h1>Leddite firmware</h1>
+<div class=m>Running <b id=v></b> on <b id=p></b>. Upload a
+<code>.bin</code> to the other slot.</div>
+<label for=f>Choose or drop a firmware image<div id=n></div></label>
+<input type=file id=f accept=".bin">
+<button id=g disabled>Install</button>
+<div id=t><div id=b></div></div>
+<div id=s></div>
+</div>
+<script>
+const $=i=>document.getElementById(i);
+fetch('/info').then(r=>r.json()).then(j=>{$('v').textContent=j.version;$('p').textContent=j.slot})
+ .catch(()=>{});
+let file=null;
+const pick=f=>{file=f;$('n').textContent=f?f.name+' — '+(f.size/1024).toFixed(0)+' KB':'';
+ $('g').disabled=!f};
+$('f').onchange=e=>pick(e.target.files[0]);
+document.ondragover=e=>e.preventDefault();
+document.ondrop=e=>{e.preventDefault();pick(e.dataTransfer.files[0])};
+$('g').onclick=()=>{
+ if(!file)return;
+ $('g').disabled=true;$('t').style.display='block';$('s').className='';
+ $('s').textContent='Uploading… do not close this tab.';
+ const d=new FormData();d.append('f',file,file.name);
+ const x=new XMLHttpRequest();
+ x.upload.onprogress=e=>{if(e.lengthComputable)$('b').style.width=(e.loaded/e.total*100)+'%'};
+ x.onload=()=>{
+  const ok=x.status===200&&x.responseText.indexOf('OK')===0;
+  $('s').className=ok?'ok':'err';
+  $('s').textContent=ok?'Installed. The panel is rebooting — check the boot banner for the new version.'
+                       :'Failed: '+(x.responseText||x.status);
+  if(!ok)$('g').disabled=false;
+ };
+ x.onerror=()=>{$('s').className='err';$('s').textContent='Connection lost during upload.';
+  $('g').disabled=false};
+ x.open('POST','/update');x.send(d);
+};
+</script>)HTML";
+
+// ── Upload handling ──────────────────────────────────────────────────────────
+
+static void paintPanel(UiController& ui, Canvas& canvas) {
     static uint8_t pix[Draw::SIZE];
-    auto paint = [&]() {
-        ui.render(pix, millis());
-        canvas.drawSprite(pix, 16, 16, 0, 0, 0, /*clearBefore=*/true);
-        FastLED.show();
-    };
+    ui.render(pix, millis());
+    canvas.drawSprite(pix, 16, 16, 0, 0, 0, /*clearBefore=*/true);
+    FastLED.show();
+}
 
-    if (!configured()) {
-        Serial.println("[OTA] no ota_config.h in this build — run tools/gen-ota-config.sh");
-        ui.setOtaResult(false);
-        paint();
+// Captured for the upload callbacks, which WebServer gives no user pointer.
+static UiController* s_ui     = nullptr;
+static Canvas*       s_canvas = nullptr;
+
+static void onUploadData() {
+    HTTPUpload& up = s_server->upload();
+
+    if (up.status == UPLOAD_FILE_START) {
+        // Content-Length includes the multipart envelope — a few hundred bytes
+        // against ~1.2 MB. Close enough for a progress bar, and the browser
+        // shows the exact figure anyway.
+        s_expected   = (uint32_t)s_server->header("Content-Length").toInt();
+        s_lastPct    = 255;
+        s_inProgress = true;
+        Serial.printf("[OTA] upload starting: %s (%lu B)\n",
+                      up.filename.c_str(), (unsigned long)s_expected);
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH)) {
+            Update.printError(Serial);
+            s_inProgress = false;
+        }
         return;
     }
-    if (WiFi.status() != WL_CONNECTED) {
-        Serial.println("[OTA] no WiFi");
-        ui.setOtaResult(false);
-        paint();
+
+    if (up.status == UPLOAD_FILE_WRITE) {
+        if (Update.isRunning() && Update.write(up.buf, up.currentSize) != up.currentSize)
+            Update.printError(Serial);
+
+        // Redraw only when the whole percent changes. Erasing a flash sector
+        // stalls the instruction cache, and repainting on every chunk turns
+        // that into visible flicker for no extra information.
+        if (s_expected > 0 && s_ui && s_canvas) {
+            const uint8_t pct =
+                (uint8_t)(((uint64_t)up.totalSize * 100) / s_expected);
+            if (pct != s_lastPct && pct <= 100) {
+                s_lastPct = pct;
+                s_ui->setOtaProgress(pct);
+                paintPanel(*s_ui, *s_canvas);
+            }
+        }
         return;
     }
 
-    s_inProgress = true;
-    ui.setOtaProgress(0);
-    paint();
-    Serial.printf("[OTA] fetching %s (current %s)\n", LEDDITE_OTA_URL, LEDDITE_FW_VERSION);
+    if (up.status == UPLOAD_FILE_END || up.status == UPLOAD_FILE_ABORTED) {
+        if (up.status == UPLOAD_FILE_ABORTED) {
+            Update.abort();
+            Serial.println("[OTA] upload aborted by client");
+        }
+        s_inProgress = false;
+    }
+}
 
-    // The transport has to match the URL's scheme. HTTPClient uses whatever
-    // client it is handed regardless of scheme, so a WiFiClientSecure pointed at
-    // an http:// host opens a TLS handshake against a plain server and fails
-    // with a bare -1 — and a LAN image server is plain HTTP far more often than
-    // not.
-    const bool useTls = (strncmp(LEDDITE_OTA_URL, "https://", 8) == 0);
+static void onUploadDone() {
+    const bool ok = Update.end(true);
+    if (!ok) Update.printError(Serial);
 
-    WiFiClientSecure secure;
-    WiFiClient       plain;
-    // For https:// the URL is a host the user configured on their own network;
-    // pinning a CA would mean shipping and rotating one for a fetch that only
-    // happens when somebody is standing at the device. See docs/adr/0014 for
-    // why that is accepted rather than solved.
-    if (useTls) secure.setInsecure();
-    NetworkClient& client = useTls ? (NetworkClient&)secure : (NetworkClient&)plain;
+    s_server->sendHeader("Connection", "close");
+    s_server->send(ok ? 200 : 500, "text/plain",
+                   ok ? "OK" : Update.errorString());
 
-    httpUpdate.rebootOnUpdate(false);        // we reboot ourselves, after a beat
-    if (LEDDITE_OTA_PASS[0] != '\0')
-        httpUpdate.setAuthorization(LEDDITE_OTA_USER, LEDDITE_OTA_PASS);
+    if (s_ui) s_ui->setOtaResult(ok);
+    if (s_ui && s_canvas) paintPanel(*s_ui, *s_canvas);
 
-    // Redraw only when the whole percent changes. Erasing a flash sector stalls
-    // the instruction cache, and repainting on every callback turns that into
-    // visible flicker for no extra information.
-    static uint8_t lastPct = 255;
-    lastPct = 255;
-    httpUpdate.onProgress([&](int done, int total) {
-        const uint8_t pct = total > 0 ? (uint8_t)(((int64_t)done * 100) / total) : 0;
-        if (pct == lastPct) return;
-        lastPct = pct;
-        ui.setOtaProgress(pct);
-        paint();
-        delay(1);                            // feed the idle task
+    if (ok) {
+        Serial.println("[OTA] written — rebooting");
+        delay(1500);              // let the OK screen be seen and the reply flush
+        ESP.restart();
+    }
+}
+
+static void openWindow(UiController& ui, Canvas& canvas) {
+    if (s_server) return;
+
+    s_ui     = &ui;
+    s_canvas = &canvas;
+    s_server = new WebServer(OtaUpdater::PORT);
+
+    // WebServer discards headers it was not told to keep, and the upload
+    // progress needs Content-Length.
+    static const char* keep[] = { "Content-Length" };
+    s_server->collectHeaders(keep, 1);
+
+    s_server->on("/", HTTP_GET, []() {
+        s_server->send_P(200, "text/html", PAGE);
+    });
+    s_server->on("/info", HTTP_GET, []() {
+        String j = String("{\"version\":\"") + OtaUpdater::version() +
+                   "\",\"slot\":\"" + OtaUpdater::runningPartition() + "\"}";
+        s_server->send(200, "application/json", j);
+    });
+    s_server->on("/update", HTTP_POST, onUploadDone, onUploadData);
+    s_server->onNotFound([]() {
+        s_server->sendHeader("Location", "/");
+        s_server->send(302, "text/plain", "");
     });
 
-    const t_httpUpdate_return result =
-        httpUpdate.update(client, LEDDITE_OTA_URL, LEDDITE_FW_VERSION);
+    s_server->begin();
+    Serial.printf("[OTA] upload window open — http://%s/ (closes in %lus)\n",
+                  WiFi.localIP().toString().c_str(),
+                  (unsigned long)(UiController::OTA_WINDOW_MS / 1000));
+}
 
-    s_inProgress = false;
+static void closeWindow() {
+    if (!s_server) return;
+    s_server->stop();
+    delete s_server;
+    s_server = nullptr;
+    s_ui     = nullptr;
+    s_canvas = nullptr;
+    Serial.println("[OTA] upload window closed");
+}
 
-    switch (result) {
-        case HTTP_UPDATE_OK:
-            Serial.println("[OTA] written — rebooting");
-            ui.setOtaResult(true);
-            paint();
-            delay(1500);                     // let the OK screen be seen
-            ESP.restart();
-            break;
-
-        case HTTP_UPDATE_NO_UPDATES:
-            // Already current. Not a failure, but the panel has only two result
-            // words and "nothing happened" is closer to ERR than to OK — say so
-            // on the serial log and show the neutral one.
-            Serial.println("[OTA] server reports no update available");
-            ui.setOtaResult(false);
-            paint();
-            break;
-
-        case HTTP_UPDATE_FAILED:
-        default:
-            Serial.printf("[OTA] failed (%d): %s\n",
-                          httpUpdate.getLastError(),
-                          httpUpdate.getLastErrorString().c_str());
-            ui.setOtaResult(false);
-            paint();
-            break;
+void OtaUpdater::service(UiController& ui, Canvas& canvas) {
+    if (ui.otaRequested()) {
+        ui.clearOtaRequest();
+        openWindow(ui, canvas);
     }
+
+    const UiController::OtaPhase phase = ui.otaPhase();
+    const bool wanted = (phase == UiController::OtaPhase::WAITING ||
+                         phase == UiController::OtaPhase::RUNNING);
+
+    if (!wanted) { closeWindow(); return; }
+    if (s_server) s_server->handleClient();
 }

@@ -166,7 +166,11 @@ document.getElementById('dev-weather').addEventListener('click', () => {
 function deviceUIEncoder(kind, delta) {
     if (renderMode !== 'device' || !deviceUI) return false;
     const now = Date.now() >>> 0;
-    if (kind === 'turn')       deviceUI.turn(delta, now);
+    // encoderTurn, not turn: the browser control stands in for the physical
+    // knob, so it must inherit the same inversion and granularity. A simulator
+    // with a nicer knob than the device is a simulator you cannot trust for
+    // feel (docs/adr/0010, docs/adr/0016).
+    if (kind === 'turn')       deviceUI.encoderTurn(delta, now);
     else if (kind === 'press') deviceUI.press(now);
     else if (kind === 'long') {
         // true means "nowhere further up" — the device would return to its main

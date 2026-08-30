@@ -24,7 +24,7 @@ const S = {
   IP_VIEW: 7, UPDATE: 8,
 };
 // Mirrors UiController::OtaPhase
-const OTA = { IDLE: 0, CONFIRM: 1, RUNNING: 2, SUCCEEDED: 3, FAILED: 4 };
+const OTA = { IDLE: 0, CONFIRM: 1, WAITING: 2, RUNNING: 3, SUCCEEDED: 4, FAILED: 5 };
 const GAME = { SNAKE: 0, INVADERS: 1, DINO: 2, PONG: 3, BREAKOUT: 4 };
 const GAME_COUNT = 5;   // mirrors Game::COUNT
 
@@ -173,11 +173,41 @@ test('the IP screen shows an address through the committed artifact', () => {
   ui.delete();
 });
 
+test('the knob is inverted and halved on lists, raw on value editors', () => {
+  // The browser control calls encoderTurn, so this is the feel a person judges
+  // the device by without having the device in front of them.
+  const ui = new mod.DeviceUI();
+  ui.enterSettings(0);
+
+  // One detent is half a row: nothing moves yet.
+  ui.encoderTurn(1, 0);
+  ui.press(0);
+  eq(ui.screen(), S.BRIGHTNESS_EDIT, 'a single detent already changed the selection');
+  ui.longPress(0);
+
+  // Two detents is one row, and the list moves against the knob — so clockwise
+  // from row 0 lands on the last row, UPDATE.
+  ui.enterSettings(0);
+  ui.encoderTurn(2, 0);
+  ui.press(0);
+  eq(ui.screen(), S.UPDATE, 'two detents did not move one row, inverted');
+  ui.longPress(0);
+
+  // The brightness editor is not a list: one click, one level, same direction.
+  ui.enterSettings(0);
+  ui.press(0);
+  const before = ui.brightnessLevel();
+  ui.encoderTurn(1, 0);
+  eq(ui.brightnessLevel(), before + 1, 'the value editor was halved or inverted');
+  ui.delete();
+});
+
 test('the OTA flow runs end to end through the committed artifact', () => {
   // The browser has no flash to write, so it plays the firmware's part: the
-  // page confirms, then feeds progress and a verdict back in. Everything except
-  // the HTTP fetch is therefore exercised without a device.
+  // page opens the window, then feeds progress and a verdict back in.
+  // Everything except the flash write is therefore exercised without a device.
   const ui = new mod.DeviceUI();
+  ui.setIpAddress(192, 168, 0, 113);   // the window is refused without one
   ui.enterSettings(0);
 
   // Walk to the UPDATE row.
@@ -207,7 +237,19 @@ test('the OTA flow runs end to end through the committed artifact', () => {
   ui.press(0);
   check(ui.otaRequested(), 'confirming YES did not raise the request');
   ui.clearOtaRequest();
-  eq(ui.otaPhase(), OTA.RUNNING, 'did not enter the progress screen');
+  eq(ui.otaPhase(), OTA.WAITING, 'did not open the upload window');
+
+  // The waiting screen is the whole ergonomics of this flow: it carries the URL
+  // you type into a browser, so it must be drawn and it must scroll.
+  ui.tick(0);
+  const waitEarly = frame(mod, ui);
+  check(anyLit(waitEarly), 'the upload window rendered blank');
+  ui.tick(4000);
+  check(!same(waitEarly, frame(mod, ui)), 'the URL never scrolled');
+
+  // Bytes arriving is what turns waiting into writing.
+  ui.setOtaProgress(1);
+  eq(ui.otaPhase(), OTA.RUNNING, 'progress did not enter the writing screen');
 
   // A running write is not cancellable from either gesture.
   ui.press(0);

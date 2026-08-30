@@ -74,6 +74,9 @@ public:
     void enterWeather(uint32_t nowMs)  { ui.enterWeather(nowMs); }
 
     void turn(int delta, uint32_t nowMs) { ui.turn(delta, nowMs); }
+    // Raw encoder detents — inverted and halved on the vertical lists, exactly
+    // as the firmware does it, so the browser knob is not a nicer knob.
+    void encoderTurn(int detents, uint32_t nowMs) { ui.encoderTurn(detents, nowMs); }
     void press(uint32_t nowMs)           { ui.press(nowMs); }
     bool longPress(uint32_t nowMs)       { return ui.longPress(nowMs); }
 
@@ -134,6 +137,7 @@ EMSCRIPTEN_BINDINGS(leddite_module) {
         .function("enterGames",          &DeviceUIWrapper::enterGames)
         .function("enterSettings",       &DeviceUIWrapper::enterSettings)
         .function("enterWeather",        &DeviceUIWrapper::enterWeather)
+        .function("encoderTurn",           &DeviceUIWrapper::encoderTurn)
         .function("turn",                &DeviceUIWrapper::turn)
         .function("press",               &DeviceUIWrapper::press)
         .function("longPress",           &DeviceUIWrapper::longPress)

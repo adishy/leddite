@@ -21,7 +21,9 @@ history; each cites the commits it is reconstructed from.
 | [0011](0011-words-not-icons-on-a-16x16-panel.md) | Words, not icons, on a 16x16 panel | 2026-08-24 | Accepted |
 | [0012](0012-unlit-is-the-best-background.md) | Unlit is the best background this panel has | 2026-08-24 | Accepted |
 | [0013](0013-screensaver-games-decide-outcomes-in-advance.md) | Screensaver games decide their outcomes in advance | 2026-08-30 | Accepted |
-| [0014](0014-ota-by-pull-with-deferred-rollback.md) | OTA by pull, triggered at the panel, with deferred rollback | 2026-08-30 | Accepted |
+| [0014](0014-ota-by-pull-with-deferred-rollback.md) | OTA by pull, triggered at the panel, with deferred rollback | 2026-08-30 | Superseded by 0015 |
+| [0015](0015-ota-by-upload-to-the-device.md) | OTA by upload to the device, in a window opened at the panel | 2026-08-30 | Accepted |
+| [0016](0016-logical-turns-and-physical-detents.md) | Logical turns and physical detents are different inputs | 2026-08-30 | Accepted |
 
 ## The thread running through these
 
@@ -38,6 +40,7 @@ Most of what followed is buying that back:
 - **0010** — extend 0005 so the simulator runs the real state machine rather than a preview of it
 - **0012** — the first decision made from *rendered output* rather than from reasoning about code, which is what 0005 and 0010 were building toward all along
 - **0013** — the first decision to make a game's *visible outcome* an explicit invariant rather than something tuned into existence
+- **0015** — the first decision *reversed by hardware*: 0014 picked the cheapest option on a table of measurements, and it never worked on the network the device was on
 
 The recurring failure mode is **a second implementation of the same thing**:
 `demo_3d_patterns.py` re-porting `PatternMode` to Python (0008), a proposed JS

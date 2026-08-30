@@ -139,11 +139,24 @@ The `Firmware <version> on <slot>` line is what distinguishes a successful OTA
 from a silent no-op. `(pending verify)` after the slot means the image is on
 probation and will roll back unless it stays up for 30 s (`docs/adr/0014`).
 
-## 5b. WiFi credentials and OTA config are separate generators
+## 5b. Updating without the cable
 
-`tools/gen-ota-config.sh` writes the gitignored `esp32_firmware/ota_config.h`. It
-is optional — the build guards the include — but without it the Settings → UPDATE
-entry reports ERR.
+After this first USB flash, later images go over the air and `wifi_credentials.h`
+is the only generated header left. At the panel: `Settings → UPDATE`, turn to
+**YES**, press. The panel scrolls `HTTP://<its own address>`; open that in a
+browser and upload `esp32_firmware.ino.bin`. Nothing to configure and no image
+server to run — see `docs/adr/0015`.
+
+The window closes itself after five minutes, so open it when you are ready to
+upload rather than in advance.
+
+To drive it from a script with no encoder, use the boot seam below with
+`-DLEDDITE_TEST_OTA_ON_BOOT`: it walks the real menu to UPDATE, confirms YES and
+leaves the window open, then
+
+```bash
+curl -sf -F "f=@build/fw/esp32_firmware.ino.bin" http://<ip>/update
+```
 
 ## 6. Hardware e2e without an encoder
 

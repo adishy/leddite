@@ -1,7 +1,10 @@
 # 0014 — OTA by pull, triggered at the panel, with deferred rollback
 
 - **Date:** 2026-08-30
-- **Status:** Accepted
+- **Status:** Superseded by [0015](0015-ota-by-upload-to-the-device.md) — the
+  transport is now a browser upload, because this pull never once completed on
+  real hardware (the device cannot open a connection to the build host). The
+  deferred-rollback design below is unchanged and still in force.
 - **Context branch:** `v2-games-overhaul`
 
 ## Context

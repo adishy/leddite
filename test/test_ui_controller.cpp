@@ -25,6 +25,9 @@ static uint16_t litPixels() {
 
 // Walks the settings list to the UPDATE row and opens it.
 static void openUpdate() {
+    // The device always knows its address by the time this screen matters, and
+    // the window is refused without one — see test_update_refuses_without_an_ip.
+    ui.setIpAddress(192, 168, 0, 113);
     ui.enterSettings(0);
     while (ui.screen() == Screen::SETTINGS_MENU) {
         ui.press(0);
@@ -56,15 +59,84 @@ void test_update_defaults_to_no() {
 }
 
 void test_update_requests_only_after_yes() {
-    TEST("turning to YES and confirming raises the request exactly once");
+    TEST("turning to YES and confirming opens the upload window exactly once");
     openUpdate();
     ui.turn(1, 0);                       // NO -> YES
     ui.press(0);
-    ASSERT(ui.otaRequested(), "confirming YES did not request an update");
-    ASSERT_EQ((int)ui.otaPhase(), (int)OtaPhase::RUNNING, "did not enter the progress screen");
+    ASSERT(ui.otaRequested(), "confirming YES did not ask the firmware for a window");
+    ASSERT_EQ((int)ui.otaPhase(), (int)OtaPhase::WAITING,
+              "did not enter the waiting screen");
 
     ui.clearOtaRequest();
     ASSERT(!ui.otaRequested(), "the request did not clear");
+    PASS();
+}
+
+void test_update_refuses_without_an_ip() {
+    TEST("with no address there is nothing to browse to, so YES fails outright");
+    ui.setNetworkDown();
+    ui.enterSettings(0);
+    while (ui.screen() == Screen::SETTINGS_MENU) {
+        ui.press(0);
+        if (ui.screen() == Screen::UPDATE) break;
+        ui.longPress(0);
+        ui.turn(1, 0);
+    }
+    ui.turn(1, 0);                       // NO -> YES
+    ui.press(0);
+    // Opening a server nobody can reach, and showing a URL that is not the
+    // device's, would be worse than saying no.
+    ASSERT(!ui.otaRequested(), "asked the firmware to open a window with no address");
+    ASSERT_EQ((int)ui.otaPhase(), (int)OtaPhase::FAILED, "did not fail outright");
+    PASS();
+}
+
+void test_waiting_window_is_cancellable_and_expires() {
+    TEST("the upload window closes on a press, on a long-press, and on its own");
+    openUpdate();
+    ui.turn(1, 0);
+    ui.press(0);
+    ui.clearOtaRequest();
+    ASSERT_EQ((int)ui.otaPhase(), (int)OtaPhase::WAITING, "not waiting");
+
+    // Nothing has been written yet, so unlike a running write this is safe to
+    // abandon — and it must be, or a mistaken YES leaves a server up.
+    ui.press(0);
+    ASSERT_EQ((int)ui.otaPhase(), (int)OtaPhase::IDLE, "press did not close the window");
+    ASSERT_EQ((int)ui.screen(), (int)Screen::SETTINGS_MENU, "press did not return to settings");
+
+    openUpdate(); ui.turn(1, 0); ui.press(0); ui.clearOtaRequest();
+    ui.longPress(0);
+    ASSERT_EQ((int)ui.otaPhase(), (int)OtaPhase::IDLE, "long-press did not close the window");
+
+    // And it must not stay open because somebody walked away.
+    openUpdate(); ui.turn(1, 0); ui.press(0); ui.clearOtaRequest();
+    ui.update(UiController::OTA_WINDOW_MS - 1);
+    ASSERT_EQ((int)ui.otaPhase(), (int)OtaPhase::WAITING, "closed early");
+    ui.update(UiController::OTA_WINDOW_MS);
+    ASSERT_EQ((int)ui.otaPhase(), (int)OtaPhase::IDLE, "the window never timed out");
+    ASSERT_EQ((int)ui.screen(), (int)Screen::SETTINGS_MENU, "timeout left the screen up");
+    PASS();
+}
+
+void test_waiting_screen_shows_the_url() {
+    TEST("the waiting screen draws the address you must type, and it scrolls");
+    openUpdate();
+    ui.turn(1, 0);
+    ui.press(0);
+    ui.clearOtaRequest();
+
+    uint8_t a[Draw::SIZE], b[Draw::SIZE];
+    ui.render(a, 0);
+    // Past the dwell and far enough for the marquee to have moved on.
+    ui.render(b, 4000);
+
+    int litA = 0;
+    for (int i = 0; i < (int)Draw::SIZE; i += 3)
+        if (a[i] || a[i + 1] || a[i + 2]) litA++;
+    ASSERT(litA > 12, "the waiting screen is essentially blank");
+    ASSERT(memcmp(a, b, Draw::SIZE) != 0,
+           "the URL never moves — a 20-character string cannot fit 16px unscrolled");
     PASS();
 }
 
@@ -74,6 +146,9 @@ void test_update_is_not_cancellable_mid_write() {
     ui.turn(1, 0);
     ui.press(0);
     ui.clearOtaRequest();
+    // The upload has started: the firmware reports bytes, which is what moves
+    // the screen from waiting to writing.
+    ui.setOtaProgress(1);
     ASSERT_EQ((int)ui.otaPhase(), (int)OtaPhase::RUNNING, "not running");
 
     // Backing out here would leave a half-written slot with the UI claiming
@@ -339,6 +414,73 @@ void test_screens_survive_the_lowest_brightness() {
     PASS();
 }
 
+void test_encoder_is_inverted_and_halved_on_lists() {
+    TEST("the knob takes two clicks per row and moves the list, not the cursor");
+    ui.enterSettings(0);
+
+    // One detent is half a row: the menu must not move at all yet. This is the
+    // whole point — one click per row overshoots on a five-item list.
+    ui.encoderTurn(1, 0);
+    ui.press(0);
+    ASSERT_EQ((int)ui.screen(), (int)Screen::BRIGHTNESS_EDIT,
+              "a single detent already moved the selection off row 0");
+    ui.longPress(0);
+
+    // Two detents is one row, and the list moves the opposite way to the knob:
+    // +2 must land on the row ABOVE row 0, which on a wrapping list is the last.
+    ui.enterSettings(0);
+    ui.encoderTurn(2, 0);
+    ui.press(0);
+    ASSERT_EQ((int)ui.screen(), (int)Screen::UPDATE,
+              "two detents clockwise did not move up one row to UPDATE");
+    ui.longPress(0);
+
+    // And the other way round: -2 goes down one row, to PLACE.
+    ui.enterSettings(0);
+    ui.encoderTurn(-2, 0);
+    ui.press(0);
+    ASSERT_EQ((int)ui.screen(), (int)Screen::PLACES_MENU,
+              "two detents anticlockwise did not move down one row to PLACE");
+    ui.longPress(0);
+
+    // Half-turns accumulate rather than being discarded...
+    ui.enterSettings(0);
+    ui.encoderTurn(-1, 0);
+    ui.encoderTurn(-1, 0);
+    ui.press(0);
+    ASSERT_EQ((int)ui.screen(), (int)Screen::PLACES_MENU,
+              "two separate detents did not add up to one row");
+    // ...but never across a screen change, or a stale half-turn steers the next
+    // menu on its first click.
+    ui.longPress(0);
+    ui.enterSettings(0);
+    ui.encoderTurn(-1, 0);
+    ui.longPress(0);
+    ui.enterSettings(0);
+    ui.encoderTurn(-1, 0);
+    ui.press(0);
+    ASSERT_EQ((int)ui.screen(), (int)Screen::BRIGHTNESS_EDIT,
+              "a half-turn leaked across a screen change");
+    ui.longPress(0);
+    PASS();
+}
+
+void test_encoder_is_raw_on_value_editors() {
+    TEST("value editors keep one click per unit, in the direction turned");
+    ui.enterSettings(0);
+    ui.press(0);                                    // BRIGHTNESS_EDIT
+    ASSERT_EQ((int)ui.screen(), (int)Screen::BRIGHTNESS_EDIT, "not on brightness");
+
+    ui.setBrightnessLevel(5);
+    ui.encoderTurn(1, 0);
+    ASSERT_EQ((int)ui.brightnessLevel(), 6,
+              "one detent did not raise the level by one — the editor is not a list");
+    ui.encoderTurn(-1, 0);
+    ASSERT_EQ((int)ui.brightnessLevel(), 5, "one detent back did not lower it by one");
+    ui.longPress(0);
+    PASS();
+}
+
 void test_games_menu_matches_the_game_enum() {
     TEST("every games-menu row starts the game at its index");
     // GAME_ITEMS is indexed straight into the Game enum, so a row inserted in
@@ -379,6 +521,9 @@ int main() {
     test_settings_reaches_update();
     test_update_defaults_to_no();
     test_update_requests_only_after_yes();
+    test_update_refuses_without_an_ip();
+    test_waiting_window_is_cancellable_and_expires();
+    test_waiting_screen_shows_the_url();
     test_update_is_not_cancellable_mid_write();
     test_update_progress_and_results();
     test_update_screens_all_render();
@@ -386,6 +531,8 @@ int main() {
     test_ip_screen_says_so_when_offline();
     test_screens_survive_the_lowest_brightness();
     test_ota_result_screens_are_distinguishable();
+    test_encoder_is_inverted_and_halved_on_lists();
+    test_encoder_is_raw_on_value_editors();
     test_games_menu_matches_the_game_enum();
     test_root_screens_exit_to_the_main_menu();
     SUMMARY("UiController");

@@ -4,12 +4,12 @@
 // ── Font Data ─────────────────────────────────────────────────────────────────
 // 5 bytes per character, one byte per column, LSB = topmost pixel (row 0).
 // Range: ASCII 0x20 (' ') to 0x5A ('Z'), 59 entries.
-// Exactly matches leddite_client.py FONT dict, extended with ':', '-', '.'.
+// Exactly matches leddite_client.py FONT dict, extended with ':', '-', '.', '/'.
 //
 // Special chars within the 0x20–0x5A range:
-//   0x20 ' '  0x21 '!'  0x2D '-'  0x2E '.'  0x3A ':'
+//   0x20 ' '  0x21 '!'  0x2D '-'  0x2E '.'  0x2F '/'  0x3A ':'
 //   0x3F '?'  0x41–0x5A A–Z
-// All others (punctuation 0x22–0x2C, 0x2F, 0x3B–0x3E, 0x40) default to space.
+// All others (punctuation 0x22–0x2C, 0x3B–0x3E, 0x40) default to space.
 
 const uint8_t TextRenderer::FONT_DATA[][5] = {
     // 0x20 ' '
@@ -42,8 +42,8 @@ const uint8_t TextRenderer::FONT_DATA[][5] = {
     {0x00, 0x08, 0x08, 0x08, 0x00},
     // 0x2E '.'
     {0x00, 0x60, 0x60, 0x00, 0x00},
-    // 0x2F '/'  — not supported
-    {0x00, 0x00, 0x00, 0x00, 0x00},
+    // 0x2F '/'  — added for the OTA window, which shows a whole URL
+    {0x20, 0x10, 0x08, 0x04, 0x02},
     // 0x30 '0'
     {0x3E, 0x51, 0x49, 0x45, 0x3E},
     // 0x31 '1'

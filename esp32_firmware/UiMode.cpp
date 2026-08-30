@@ -87,7 +87,9 @@ void UiMode::enterWeather(Canvas& canvas) {
 // ── Encoder ───────────────────────────────────────────────────────────────────
 
 void UiMode::onEncoderTurn(int delta) {
-    ui.turn(delta, millis());
+    // Raw detents from the ESP32Encoder: encoderTurn() applies the list
+    // inversion and the two-clicks-per-row granularity (docs/adr/0016).
+    ui.encoderTurn(delta, millis());
     // Brightness is applied live so the panel itself previews the level.
     applyBrightness();
     lastFrameMs = 0;

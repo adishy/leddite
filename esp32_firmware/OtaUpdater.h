@@ -5,68 +5,76 @@
 class UiController;
 class Canvas;
 
-// OtaUpdater — over-the-air firmware updates, pulled on demand.
+// OtaUpdater — over-the-air firmware updates, uploaded to the device.
 //
-// WHY A PULL, TRIGGERED BY THE ENCODER
-// ------------------------------------
-// The three candidates were measured against this firmware on esp32 core 3.3.8
-// (baseline 1,184,240 B of a 1,310,720 B app slot):
+// THE FLOW
+// --------
+// At the panel: Settings -> UPDATE -> YES. The device opens an HTTP server on
+// port 80 and scrolls its own URL across the display. You browse to that URL,
+// pick a .bin, and the browser POSTs it straight into the spare app slot. The
+// window closes on upload, on cancel, or after UiController::OTA_WINDOW_MS.
 //
-//   ArduinoOTA (+ mDNS)              +54,260 B flash  +4,712 B RAM
-//   WebServer upload form + Update   +31,400 B flash    +624 B RAM
-//   HTTPUpdate pull                  +13,936 B flash    +384 B RAM
+// WHY THIS, AND NOT THE PULL IT REPLACES
+// --------------------------------------
+// The original design fetched an image from a URL baked in at compile time.
+// Three things were wrong with it in practice:
 //
-// HTTPUpdate is both the cheapest and the only one that leaves nothing
-// listening. ArduinoOTA and the upload form each add a network service that
-// accepts firmware from anyone on the LAN for the entire uptime of the device;
-// this one reaches out exactly when somebody standing at the panel selects
-// Settings -> UPDATE -> YES. On a home LAN that beats any password on an open
-// socket, which is why the HTTP Basic credentials here are a guard against a
-// mistake rather than against an attacker.
+//   1. It needs a server. Somebody has to run one, on a machine the device can
+//      reach, and keep it running.
+//   2. It needs the device to reach *you*. On the network this was built on it
+//      could not: the panel reaches its gateway in 8 ms and 1.1.1.1 in 20 ms,
+//      and times out against the build host every time. Firmware cannot fix a
+//      routing problem, and the pull path was never once exercised end to end.
+//   3. The URL is compile-time, so changing where updates come from needs the
+//      cable the feature exists to avoid.
 //
-// The TLS stack is already paid for: WeatherClient links WiFiClientSecure and
-// HTTPClient regardless, so an https:// URL costs nothing extra here.
+// Uploading inverts all three. The browser already holds the file, the
+// connection runs browser -> device (the direction that works here, as the
+// WebSocket canvas on :81 has always demonstrated), and there is nothing to
+// configure: the address you need is on the panel in front of you.
+//
+// "BUT SOMETHING IS LISTENING NOW"
+// --------------------------------
+// docs/adr/0014 rejected an upload form precisely because it listens. That
+// objection was to a server running for the device's whole uptime, accepting
+// firmware from anyone on the LAN. This one exists only inside a window a
+// person opened by turning a knob and pressing it, and closes itself after five
+// minutes. Physical presence remains the authentication factor, which is the
+// property the ADR actually cared about.
 //
 // PARTITIONS
 // ----------
-// OTA needs two app slots. `default.csv` already has them (app0 @0x10000 and
-// app1 @0x150000, 0x140000 each) — the "90% of flash" figure in CLAUDE.md was
-// always 90% of *one slot*, not of the whole chip. The build nevertheless moves
-// to `min_spiffs`, which keeps two slots and raises each to 0x1E0000, taking
-// usage from ~91% to ~61%. Nothing in this repo uses SPIFFS or LittleFS, and
-// `nvs` stays at 0x9000/0x5000 in both schemes, so the saved brightness, place
-// and unit survive the switch.
-//
-// **The first flash after this change must be over USB.** A partition table is
-// not part of an OTA payload, so a device still running the `default` layout
-// would write a min_spiffs image into a slot at the wrong offset.
+// OTA needs two app slots; `min_spiffs` gives two of 0x1E0000, taking this
+// build to ~61% of a slot. `nvs` stays at 0x9000/0x5000, so saved brightness,
+// place and unit survive. **The first flash after a partition change must be
+// over USB** — a partition table is not part of an OTA payload.
 //
 // ROLLBACK
 // --------
-// The core enables CONFIG_APP_ROLLBACK_ENABLE and, by default, marks a freshly
-// written image valid inside initArduino() — *before* setup() runs — so an image
-// that bricks itself on boot is already committed by the time it fails. This
-// class overrides the core's weak verifyRollbackLater() hook to defer that, and
-// calls confirmBootHealthy() only once the device has actually joined WiFi and
-// rendered frames for HEALTHY_AFTER_MS. A bad image reverts to the previous slot
-// on the next reboot instead of needing a cable.
+// The core enables CONFIG_APP_ROLLBACK_ENABLE and marks a freshly written image
+// valid inside initArduino(), *before* setup() runs — so an image that bricks
+// itself on boot is already committed by the time it fails. This class
+// overrides the weak verifyRollbackLater() hook to defer that, and confirms the
+// image only once the device has joined WiFi and run for HEALTHY_AFTER_MS. A
+// bad image reverts to the previous slot on the next reboot, with no cable.
 
 class OtaUpdater {
 public:
     // How long the new image has to keep running before it is marked good.
     static const uint32_t HEALTHY_AFTER_MS = 30000;
 
-    // True when this build has an ota_config.h to fetch from.
-    static bool configured();
+    // The port the upload page is served on. 80 so the URL on the panel needs
+    // no ":port" suffix — that is four more glyphs to read off a 16px display
+    // and four more chances to mistype it.
+    static const uint16_t PORT = 80;
 
-    // The version string this image reports, both in the boot banner and as the
-    // x-ESP32-version header. Printing it at boot is what makes an OTA
-    // verifiable: without it, a successful update and a silent no-op look
-    // exactly alike on the serial log.
+    // The version string this image reports, printed in the boot banner and
+    // shown on the upload page. Printing it is what makes an update verifiable:
+    // without it, a real update and a silent no-op look identical.
     static const char* version();
 
-    // Which app slot is running ("app0"/"app1"), and whether this image is still
-    // on probation — i.e. written by OTA and not yet confirmed healthy.
+    // Which app slot is running ("app0"/"app1"), and whether this image is
+    // still on probation — written by OTA and not yet confirmed healthy.
     static const char* runningPartition();
     static bool        pendingVerify();
 
@@ -74,13 +82,18 @@ public:
     // it can boot, connect and render. Cheap and idempotent after that.
     static void tick();
 
-    // Blocking: fetches and writes the new image, driving the panel's progress
-    // screen through `ui` as bytes land. Reboots on success.
-    static void run(UiController& ui, Canvas& canvas);
+    // Call every loop(). Opens the upload window when the panel asks for it,
+    // pumps the HTTP server while it is open, and closes it again as soon as
+    // the UI leaves the waiting/running phases. Non-blocking; the upload itself
+    // runs inside handleClient().
+    static void service(UiController& ui, Canvas& canvas);
 
     // True while a flash write is in flight — WeatherClient uses this to stay
-    // off the air. Two concurrent TLS sessions cost ~40 KB of heap each and this
-    // device has ~250 KB free; the weather fetch is the one thing that could
-    // collide with an update, and it is entirely skippable for a minute.
+    // off the air. Two concurrent TLS sessions cost ~40 KB of heap each and
+    // this device has ~250 KB free; the weather fetch is the one thing that
+    // could collide with an update, and it is entirely skippable for a minute.
     static bool inProgress();
+
+    // True while the upload window is open.
+    static bool windowOpen();
 };

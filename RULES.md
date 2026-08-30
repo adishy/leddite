@@ -67,6 +67,13 @@ game-screensavers work), files existing in both `src/` and `esp32_firmware/` mus
 be changed in both places, and the WASM rebuilt. See `docs/adr/0009` for why the
 duplication exists and what replaces it.
 
+Run `tools/sync-firmware-copies.sh` rather than copying by hand, and
+`--check` in CI. **The script's `MODULES` list is the rule** — it must name every
+duplicated file, or `--check` reports "all copies match" about files it never
+looked at. That happened: `TextRenderer` was absent from the list, so a glyph
+added in `src/` never reached the device and the guard said everything was in
+step.
+
 ---
 
 ## 3. New mode logic goes in `src/`, not `esp32_firmware/`

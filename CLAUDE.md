@@ -121,40 +121,38 @@ tools/gen-wifi-credentials.sh [path-to-env-file]
 
 ### OTA updates
 
-`Settings → UPDATE` pulls a new image from a URL and writes it to the other app
-slot. The confirmation always opens on **NO**, and the device only ever fetches —
-nothing listens (`docs/adr/0014`). `Settings → IP` shows the device's address,
-scrolling in the 5×7 font; you cannot point an update at a device whose address
-you do not know.
-
-**The device connects *to your machine*, which most desktop firewalls drop by
-default.** On this repo's Linux box `ufw` is active with
-`DEFAULT_INPUT_POLICY="DROP"`, and the fetch fails as
-`[OTA] failed (-1): HTTP error: connection refused` — a timeout surfaced under
-that name. Ping is not a useful check: `ufw` permits ICMP while dropping TCP, so
-the device pings fine and still cannot fetch. `ufw`'s logging is also rate
-limited, so the blocked SYN may not even appear in `/var/log/ufw.log`.
-
-```bash
-sudo ufw allow 8123/tcp comment 'leddite OTA image server'
-```
-
-```bash
-tools/gen-ota-config.sh [path-to-env-file]     # writes esp32_firmware/ota_config.h (gitignored)
-```
-
-It reads `LEDDITE_OTA_URL` (required), `LEDDITE_OTA_USER`, `LEDDITE_OTA_PASS` and
-`LEDDITE_FW_VERSION`; see `esp32_firmware/ota_config.h.example`. The header is
-guarded by `__has_include`, so a clone without it still compiles — the menu entry
-stays and reports ERR.
-
-Publishing an image is just serving the compiled `.bin`:
+`Settings → UPDATE` opens a **browser upload window**, it does not fetch
+(`docs/adr/0015`; `docs/adr/0014` is the superseded pull). The confirmation always
+opens on **NO**. Turning to YES starts an HTTP server on port 80 and scrolls the
+device's URL — `HTTP://192.168.0.113` — across the panel. You browse to it, drop a
+`.bin` on the page, and it is written to the other app slot.
 
 ```bash
 arduino-cli compile -b esp32:esp32:esp32:PartitionScheme=min_spiffs \
   --output-dir build/fw esp32_firmware/esp32_firmware.ino
-cp build/fw/esp32_firmware.ino.bin /srv/leddite.bin
+# then: Settings → UPDATE → YES at the panel, browse to the URL it shows,
+# and upload build/fw/esp32_firmware.ino.bin
 ```
+
+There is nothing to configure and no image server to run. `tools/gen-ota-config.sh`
+and `ota_config.h` are gone; the version string is `LEDDITE_FW_VERSION` in
+`OtaUpdater.cpp`, overridable with a build property.
+
+**The window is deliberately short-lived.** It closes on the next press, on a
+long-press, on completion, and after `UiController::OTA_WINDOW_MS` (5 min). An
+upload server that stayed up for the device's whole uptime would accept firmware
+from anyone on the LAN — the window is what keeps physical presence as the
+authentication factor.
+
+**No firewall rule is needed on your machine.** The connection runs browser →
+device. The earlier pull needed the reverse and never worked here: the panel
+reaches its gateway in 8 ms and `1.1.1.1` in 20 ms but times out against the build
+host every time, because it sits one router hop away (host→gateway `ttl=64`,
+host→device `ttl=63`) and its ARP for an apparently on-link host never crosses
+that hop. A `ufw allow` was added on a wrong diagnosis and changed nothing.
+
+`Settings → IP` shows the same address on its own, for the times you want it
+without opening an update window.
 
 A freshly written image is on probation: `OtaUpdater::tick()` marks it valid only
 after 30 s of connected uptime, so an image that fails to boot rolls back to the

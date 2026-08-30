@@ -200,8 +200,8 @@ void setup() {
     //     --build-property "compiler.cpp.extra_flags=-DLEDDITE_BOOT_MODE=2" ...
     //
     // The mode entry is all they force. Everything downstream — the protocol
-    // handler, the canvas, the serpentine mapping, the ACK, OtaUpdater::run() —
-    // is the production path, which is the point.
+    // handler, the canvas, the serpentine mapping, the ACK, the OTA upload
+    // window — is the production path, which is the point.
 #ifdef LEDDITE_BOOT_MODE
     currentMode = (AppMode)LEDDITE_BOOT_MODE;
     Serial.printf("[TEST] boot mode forced to %d\n", (int)LEDDITE_BOOT_MODE);
@@ -210,10 +210,27 @@ void setup() {
     updateDisplay();
 #endif
 #ifdef LEDDITE_TEST_OTA_ON_BOOT
-    // Exercises the real fetch/write/verify path against a real server.
-    Serial.println("[TEST] triggering OTA from boot");
+    // Opens the upload window with no encoder, so a script can POST an image.
+    // It walks the real menu rather than reaching past it: Settings -> UPDATE,
+    // turn onto YES, press. Every transition under test is the one a person
+    // performs, which is what makes this a seam and not a back door.
+    Serial.println("[TEST] opening the OTA upload window from boot");
     delay(2000);                       // let WiFi settle and the banner flush
-    OtaUpdater::run(uiMode.controller(), canvas);
+    {
+        UiController& c = uiMode.controller();
+        // The controller learns its address from refreshNetworkStatus(), which
+        // normally runs in loop() — and loop() has not started yet. Without
+        // this the walk below reaches YES with no address and is correctly
+        // refused, which is a real guard doing its job, not a bug to route past.
+        uiMode.refreshNetworkStatus();
+        uiMode.enterSettings(canvas);
+        c.turn(UiController::SETTINGS_UPDATE_INDEX, millis());  // onto UPDATE
+        c.press(millis());                     // -> CONFIRM (defaults to NO)
+        c.turn(1, millis());                   // -> YES
+        c.press(millis());                     // -> WAITING; window opens
+        currentMode = AppMode::SETTINGS;
+        updateDisplay();
+    }
 #endif
 }
 
@@ -248,11 +265,11 @@ void loop() {
     // and connected — until it does, a bad image rolls back on the next reboot
     // rather than needing a cable (see OtaUpdater.h).
     OtaUpdater::tick();
-    if (uiMode.controller().otaRequested()) {
-        uiMode.controller().clearOtaRequest();
-        OtaUpdater::run(uiMode.controller(), canvas);   // blocks; reboots on success
-        return;
-    }
+    // service() opens the upload window when the panel asks, pumps the HTTP
+    // server while it is open, and closes it again the moment the UI leaves the
+    // waiting/running phases. Non-blocking, so the panel keeps animating the
+    // URL while somebody walks to a browser.
+    OtaUpdater::service(uiMode.controller(), canvas);
     {
         static WeatherData wx;
         if (weatherClient.poll(wx) || currentMode == AppMode::CLOCK_CAL) {

@@ -68,22 +68,18 @@
         <!-- OTA walkthrough. The panel is 16x16: it can show a progress bar and
              the word ERR, and it has nowhere to tell you *why*. That explanation
              has to live somewhere, and the simulator is the one place a person
-             is already looking at this UI. -->
+             is already looking at this UI. See docs/adr/0015. -->
         <details class="ota-guide" id="ota-guide">
             <summary>Updating firmware over the air (OTA)</summary>
 
             <p class="ota-lead">
-                The device only ever <strong>pulls</strong>, and only when someone presses the
-                encoder — nothing listens on the network. So an update is three things:
-                build an image, serve it, then walk to the panel.
+                You <strong>upload</strong> an image to the panel from your browser. The device
+                opens an HTTP server only while somebody is standing at it holding the update
+                screen open, and shows you the address to browse to. There is no image server
+                to run and nothing to configure.
             </p>
 
             <ol class="ota-steps">
-                <li>
-                    <b>Find the device's address.</b> On the panel:
-                    <code>Settings &rarr; IP</code>. It shows one octet per row.
-                    <span class="ota-try" data-goto="ip">Show me that screen &rarr;</span>
-                </li>
                 <li>
                     <b>Build an image.</b> The partition scheme is not optional — omitting it
                     silently builds for the smaller layout:
@@ -91,21 +87,25 @@
   --output-dir build/fw esp32_firmware/esp32_firmware.ino</pre>
                 </li>
                 <li>
-                    <b>Serve it</b> from any static HTTP server on your machine:
-<pre>cp build/fw/esp32_firmware.ino.bin /srv/leddite.bin
-python3 -m http.server 8123 --directory /srv --bind 0.0.0.0</pre>
-                </li>
-                <li>
-                    <b>Point the device at it</b> — writes the gitignored
-                    <code>esp32_firmware/ota_config.h</code>, then reflash once over USB:
-<pre>LEDDITE_OTA_URL="http://&lt;your-ip&gt;:8123/leddite.bin" \
-  tools/gen-ota-config.sh</pre>
-                </li>
-                <li>
-                    <b>Run it.</b> On the panel: <code>Settings &rarr; UPDATE</code>. It opens on
-                    <b>NO</b> — turn to <b>YES</b> and press. You get a percentage and a bar,
-                    then <code>OK</code>, then a reboot.
+                    <b>Open the window at the panel.</b> <code>Settings &rarr; UPDATE</code>. It
+                    opens on <b>NO</b> — turn to <b>YES</b> and press. The panel then scrolls the
+                    URL to type, e.g. <code>HTTP://192.168.0.113</code>.
                     <span class="ota-try" data-goto="update">Show me that screen &rarr;</span>
+                </li>
+                <li>
+                    <b>Open that URL</b> in a browser on the same network. The page names the
+                    version and slot currently running. Drop
+                    <code>build/fw/esp32_firmware.ino.bin</code> on it and press
+                    <b>Install</b>.
+                </li>
+                <li>
+                    <b>Watch both screens.</b> The browser shows the exact byte count; the panel
+                    shows a percentage and a bar, then <code>OK</code>, then reboots itself.
+                </li>
+                <li>
+                    <b>Confirm it took.</b> The boot banner prints the version and the running
+                    slot (<code>app0</code>/<code>app1</code>). That line is the only way to tell
+                    a real update from a silent no-op.
                 </li>
             </ol>
 
@@ -116,23 +116,28 @@ python3 -m http.server 8123 --directory /srv --bind 0.0.0.0</pre>
             </div>
 
             <div class="ota-note">
-                <b>If the panel shows <code>ERR</code>:</b> it has 16&times;16 pixels and no room
-                to say why. The reason is on the serial log — but in practice it is almost
-                always one of these:
+                <b>The window closes itself after five minutes.</b> That is deliberate: an
+                upload server that stays up for the device's whole uptime would accept firmware
+                from anyone on the network. If it times out, just press again — nothing is lost.
+            </div>
+
+            <div class="ota-note">
+                <b>If something goes wrong:</b> the panel has 16&times;16 pixels and no room to
+                say why. In practice it is one of these:
                 <ul>
-                    <li><b>Your firewall is dropping the device's connection.</b> The device
-                        connects <em>to your machine</em>, which most desktop firewalls block by
-                        default. On Ubuntu:
-                        <code>sudo ufw allow 8123/tcp</code>.
-                        Ping is not a useful check here — <code>ufw</code> permits ICMP while
-                        dropping TCP, so the device pings fine and still cannot fetch.</li>
-                    <li><b>Wrong address.</b> Your machine's IP, not the device's. Check it
-                        against <code>Settings &rarr; IP</code> on the panel.</li>
-                    <li><b>Different networks.</b> Some routers keep 2.4 GHz and 5 GHz clients
-                        apart, and the ESP32 is 2.4 GHz only.</li>
-                    <li><b>Already up to date.</b> The server returned "no update"; the panel has
-                        only two words and shows <code>ERR</code> for it.</li>
+                    <li><b>The panel shows <code>ERR</code> straight after YES.</b> It has no
+                        address — it never joined WiFi. <code>Settings &rarr; IP</code> will say
+                        <code>NO WIFI</code> too.
+                        <span class="ota-try" data-goto="ip">Show me that screen &rarr;</span></li>
+                    <li><b>The browser cannot reach the URL.</b> You are on a different network
+                        from the panel. Some routers also keep 2.4 GHz and 5 GHz clients apart,
+                        and the ESP32 is 2.4 GHz only.</li>
+                    <li><b>The upload fails part way.</b> Wrong file — it must be the
+                        <code>.bin</code>, not the <code>.elf</code> or the merged image. The
+                        browser prints the reason the device gave.</li>
                 </ul>
+                Nothing here needs a firewall rule on your machine: the connection runs from
+                your browser to the panel, not the other way round.
             </div>
 
             <div class="ota-note">
