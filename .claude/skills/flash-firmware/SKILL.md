@@ -145,8 +145,50 @@ probation and will roll back unless it stays up for 30 s (`docs/adr/0014`).
 is optional — the build guards the include — but without it the Settings → UPDATE
 entry reports ERR.
 
-## 6. Optional hardware e2e
+## 6. Hardware e2e without an encoder
 
-`test_suite.py <ip> 81` requires the device to be in **Network Canvas** mode,
-which needs physical encoder navigation. Say so rather than reporting the suite
-as passing when it was never reachable.
+`test_suite.py <ip> 81` needs the device in **Network Canvas** mode. Do NOT
+assume that means physical navigation is required — it is not, and asserting so
+without checking wasted a round trip once already.
+
+The WebSocket server's listening socket is opened in `setup()`, so a host can
+complete a **TCP connect** to port 81 from any mode. But `webSocket.loop()` is
+only pumped inside `NetworkMode::update()`, so from the boot menu the
+**WebSocket handshake times out**. A bare TCP probe is therefore not evidence
+the device is reachable.
+
+Use the compile-time boot-mode seam instead. It is `#ifdef`-guarded and costs
+nothing in a normal build (verified: production builds are byte-for-byte the
+same size with and without it):
+
+```bash
+# AppMode: 0 MENU, 1 CLOCK_CAL, 2 NETWORK, 3 TIMER, 4 OCTOPUS, 5 GAMES, 6 SETTINGS
+arduino-cli compile -b esp32:esp32:esp32:PartitionScheme=min_spiffs \
+  --build-property "compiler.cpp.extra_flags=-DLEDDITE_BOOT_MODE=2" \
+  --output-dir build/fw-net esp32_firmware/esp32_firmware.ino
+arduino-cli upload -p /dev/ttyUSB0 -b esp32:esp32:esp32:PartitionScheme=min_spiffs \
+  --input-dir build/fw-net esp32_firmware/esp32_firmware.ino
+.venv/bin/python test_suite.py <ip> 81
+```
+
+Look for `[TEST] boot mode forced to 2` in the boot log. Only the mode *entry*
+is forced; the protocol handler, canvas, serpentine mapping and ACK path are all
+production code.
+
+`-DLEDDITE_TEST_OTA_ON_BOOT` does the same for `OtaUpdater::run()`, firing a real
+fetch-and-write against a real server at the end of `setup()`.
+
+**Reflash a clean production image when you are done.** A test image re-triggers
+its hook on every boot.
+
+### The OTA image server needs a firewall hole
+
+The device pulls over TCP to the build host. `ufw` here defaults to
+`DEFAULT_INPUT_POLICY="DROP"`, so the fetch fails with
+`[OTA] failed (-1): HTTP error: connection refused` — which is a *timeout*
+surfaced under that name, not a real RST. Ping still works, so ICMP reachability
+proves nothing here.
+
+```bash
+sudo ufw allow 8123/tcp comment 'leddite OTA image server'   # and delete it after
+```

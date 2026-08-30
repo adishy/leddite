@@ -182,6 +182,39 @@ void setup() {
     updateDisplay();
 
     Serial.println("Boot menu: rotate encoder to navigate, press to select");
+
+    // ── Hardware test seam ────────────────────────────────────────────────────
+    // Every mode is reachable only by turning and pressing a physical encoder,
+    // which makes all of them untestable on real hardware from a script. That is
+    // not a small gap: the WebSocket server's listening socket is opened in
+    // setup() and announced in the boot banner, but webSocket.loop() is only
+    // pumped inside NetworkMode::update(), so a host can complete a TCP connect
+    // and then time out on the WebSocket handshake — which is exactly what
+    // happened the first time hardware E2E was attempted.
+    //
+    // These two hooks are compiled out of a normal build (both #ifdefs are
+    // undefined, so this costs nothing in flash) and are set from the command
+    // line for a test image:
+    //
+    //   arduino-cli compile -b esp32:esp32:esp32:PartitionScheme=min_spiffs \
+    //     --build-property "compiler.cpp.extra_flags=-DLEDDITE_BOOT_MODE=2" ...
+    //
+    // The mode entry is all they force. Everything downstream — the protocol
+    // handler, the canvas, the serpentine mapping, the ACK, OtaUpdater::run() —
+    // is the production path, which is the point.
+#ifdef LEDDITE_BOOT_MODE
+    currentMode = (AppMode)LEDDITE_BOOT_MODE;
+    Serial.printf("[TEST] boot mode forced to %d\n", (int)LEDDITE_BOOT_MODE);
+    if (currentMode == AppMode::GAMES)    uiMode.enterGames(canvas);
+    if (currentMode == AppMode::SETTINGS) uiMode.enterSettings(canvas);
+    updateDisplay();
+#endif
+#ifdef LEDDITE_TEST_OTA_ON_BOOT
+    // Exercises the real fetch/write/verify path against a real server.
+    Serial.println("[TEST] triggering OTA from boot");
+    delay(2000);                       // let WiFi settle and the banner flush
+    OtaUpdater::run(uiMode.controller(), canvas);
+#endif
 }
 
 // ── Shared helper: go back to boot menu ──────────────────────────────────────
