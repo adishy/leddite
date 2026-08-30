@@ -87,6 +87,31 @@ worth reporting — record it rather than quietly accepting it.
 
 ## What this cannot see
 
+**Global brightness.** The sheets render the RAW frame buffer. On the device
+FastLED multiplies every channel by `level/255`, and level 1 is **6** — so any
+channel below about 43 floors to zero and is simply not on the panel:
+
+| raw value | at level 1 | at level 4 (default) |
+|---|---|---|
+| 38 (a "dim" track) | **0** | 9 |
+| 50 (a score pip) | 1 | 12 |
+| 245 (a glyph) | 5 | 63 |
+
+Level 1 is a perfectly usable setting, not a corner case — the panel is legible
+there. What stops being legible is anything drawn dim. The OTA progress track
+shipped at `(30, 30, 38)`: correct in review, invisible on a device set to level
+1, leaving the screen a lone digit exactly when the user is watching for
+progress.
+
+So: **at low global brightness you can only modulate by coverage, not by value.**
+Draw furniture as sparse bright pixels, not as a dim solid fill. That is
+`docs/adr/0012` one step further on — it is not only that unlit beats dim-lit for
+contrast, it is that dim-lit stops existing once the panel is turned down.
+`test_screens_survive_the_lowest_brightness` enforces it for the settings
+screens; the sheets cannot.
+
+## What this also cannot see
+
 `MenuMode` (the boot menu), `TimeMode` (clock and date), `TimerMode` and
 `OctopusMode` still live only in `esp32_firmware/` and depend on Arduino, so
 they have no WASM binding and cannot be captured at all. Reviewing those needs

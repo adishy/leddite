@@ -453,15 +453,29 @@ void UiController::renderUpdate(uint8_t* buf) const {
             SmallTextRenderer::renderText(pct, txt, w, h, PINK);
             Draw::blit(buf, txt, w, h, (int16_t)((16 - (int16_t)w) / 2), 3);
 
-            // The track has to be visible even at 0%. BrightnessModel can get
-            // away with an almost-black (14,14,16) track because its bar is
-            // never empty; here 0% is a real state, and with an invisible track
-            // the screen was a single lone digit — indistinguishable from a
-            // hung device at exactly the moment you are watching for progress.
-            Draw::rect(buf, TRACK_X, BAR_Y, TRACK_W, BAR_H, 30, 30, 38);
+            // The empty part of the track is drawn as SPARSE BRIGHT PIXELS, not
+            // as a dim solid bar.
+            //
+            // FastLED's global brightness multiplies every channel by
+            // level/255, and level 1 is 6 — so anything below about 43 floors to
+            // zero and simply is not on the panel. A dim (30,30,38) track is
+            // invisible at the bottom three levels, which is where this screen
+            // was a single lone digit on black: indistinguishable from a hung
+            // device at exactly the moment you are watching for progress.
+            //
+            // At low global brightness you can only modulate by COVERAGE, not by
+            // value. That is the same argument as docs/adr/0012 one step on: it
+            // is not just that unlit beats dim-lit for contrast, it is that
+            // dim-lit stops existing at all once the user turns the panel down.
+            for (int16_t x = TRACK_X; x < TRACK_X + TRACK_W; x += 3)
+                Draw::px(buf, x, BAR_Y + 1, (uint8_t)(PINK[0] / 2),
+                         (uint8_t)(PINK[1] / 2), (uint8_t)(PINK[2] / 2));
+            // End caps mark the extent, so an empty bar still reads as a bar.
+            Draw::px(buf, TRACK_X,               BAR_Y + 1, PINK[0], PINK[1], PINK[2]);
+            Draw::px(buf, TRACK_X + TRACK_W - 1, BAR_Y + 1, PINK[0], PINK[1], PINK[2]);
 
-            // And always show at least one lit pixel once the write has started,
-            // so the bar reads as "begun" rather than "not responding".
+            // Always at least one lit pixel once the write has started, so the
+            // bar reads as "begun" rather than "not responding".
             uint8_t fill = (uint8_t)(((uint16_t)TRACK_W * otaPct) / 100);
             if (fill < 1)       fill = 1;
             if (fill > TRACK_W) fill = TRACK_W;

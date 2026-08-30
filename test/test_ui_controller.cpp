@@ -1,5 +1,6 @@
 #include "UiController.h"
 #include "Draw.h"
+#include "BrightnessModel.h"
 #include "test_harness.h"
 #include <string.h>
 
@@ -252,6 +253,92 @@ void test_ip_screen_says_so_when_offline() {
     PASS();
 }
 
+void test_screens_survive_the_lowest_brightness() {
+    TEST("every screen still lights pixels at brightness level 1");
+    // FastLED's global brightness multiplies each channel by level/255, and
+    // level 1 is 6 — so any channel below ~43 floors to zero and is simply not
+    // on the panel. A contact sheet renders the RAW buffer and cannot show this,
+    // which is how the OTA progress track shipped at (30,30,38): correct in
+    // review, invisible on a device set to level 1, leaving the screen a single
+    // lone digit exactly when you are watching for progress.
+    //
+    // The lesson is that at low global brightness you can only modulate by
+    // COVERAGE, not by value — docs/adr/0012 one step further on.
+    const uint8_t scale = BrightnessModel::levelToFastLED(BrightnessModel::MIN_LEVEL);
+
+    // Counts pixels that are still lit after the global scale, within a row
+    // band. Banding matters: a whole-screen count is not discriminating here,
+    // because the percentage digit alone clears any sensible threshold while the
+    // bar beside it is completely dark — which is exactly the bug.
+    auto litRowsAfterScaling = [&](uint8_t y0, uint8_t y1) {
+        uint16_t n = 0;
+        for (uint8_t y = y0; y <= y1; y++)
+            for (uint8_t x = 0; x < 16; x++) {
+                const uint16_t i = (uint16_t)((y * 16 + x) * 3);
+                const uint16_t r = ((uint16_t)buf[i]     * scale) >> 8;
+                const uint16_t g = ((uint16_t)buf[i + 1] * scale) >> 8;
+                const uint16_t b = ((uint16_t)buf[i + 2] * scale) >> 8;
+                if (r | g | b) n++;
+            }
+        return n;
+    };
+    auto litAfterScaling = [&]() { return litRowsAfterScaling(0, 15); };
+
+    // The OTA progress screen at 0% is the specific regression: the percentage
+    // digit alone is indistinguishable from a hung device, so the bar must
+    // survive too.
+    ui.enterSettings(0);
+    uint8_t guard = 0;
+    while (ui.screen() == Screen::SETTINGS_MENU && guard++ < 10) {
+        ui.press(0);
+        if (ui.screen() == Screen::UPDATE) break;
+        ui.longPress(0);
+        ui.turn(1, 0);
+    }
+    ASSERT_EQ((int)ui.screen(), (int)Screen::UPDATE, "never reached the update screen");
+    ui.turn(1, 0);
+    ui.press(0);
+    ui.clearOtaRequest();
+
+    // The bar occupies rows 10-12; the percentage digit sits well above it.
+    static const uint8_t BAR_Y0 = 10, BAR_Y1 = 12;
+
+    ui.setOtaProgress(0);
+    ui.render(buf, 0);
+    const uint16_t bar0 = litRowsAfterScaling(BAR_Y0, BAR_Y1);
+    // A 1px fill floor alone is 3 pixels. The empty track has to contribute
+    // more than that, or an empty bar is indistinguishable from no bar.
+    ASSERT(bar0 >= 6, "the empty progress track vanishes at the lowest brightness");
+
+    // And it must still grow, or the bar conveys nothing at level 1.
+    ui.setOtaProgress(70);
+    ui.render(buf, 0);
+    ASSERT(litRowsAfterScaling(BAR_Y0, BAR_Y1) > bar0,
+           "the bar does not fill at the lowest brightness");
+
+    // Every other screen must keep something on the panel too.
+    struct { const char* name; Screen want; } SCREENS[] = {
+        { "brightness", Screen::BRIGHTNESS_EDIT },
+        { "units",      Screen::UNITS_EDIT },
+        { "IP",         Screen::IP_VIEW },
+    };
+    for (const auto& sc : SCREENS) {
+        ui.enterSettings(0);
+        ui.setIpAddress(192, 168, 0, 113);
+        guard = 0;
+        while (ui.screen() == Screen::SETTINGS_MENU && guard++ < 10) {
+            ui.press(0);
+            if (ui.screen() == sc.want) break;
+            ui.longPress(0);
+            ui.turn(1, 0);
+        }
+        ASSERT_EQ((int)ui.screen(), (int)sc.want, "never reached a settings screen");
+        ui.render(buf, 0);
+        ASSERT(litAfterScaling() >= 4, "a settings screen goes dark at level 1");
+    }
+    PASS();
+}
+
 void test_games_menu_matches_the_game_enum() {
     TEST("every games-menu row starts the game at its index");
     // GAME_ITEMS is indexed straight into the Game enum, so a row inserted in
@@ -297,6 +384,7 @@ int main() {
     test_update_screens_all_render();
     test_ip_screen_shows_every_octet();
     test_ip_screen_says_so_when_offline();
+    test_screens_survive_the_lowest_brightness();
     test_ota_result_screens_are_distinguishable();
     test_games_menu_matches_the_game_enum();
     test_root_screens_exit_to_the_main_menu();
